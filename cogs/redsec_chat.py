@@ -116,22 +116,28 @@ class ReyChat(commands.Cog):
 
         answer = None
         if "choices" in data and isinstance(data["choices"], list) and data["choices"]:
-            message = data["choices"][0].get("message") or {}
-            answer = message.get("content")
+            choice = data["choices"][0]
+            if isinstance(choice, dict):
+                message = choice.get("message") or {}
+                if isinstance(message, dict):
+                    answer = message.get("content") or message.get("text")
+                answer = answer or choice.get("text")
         if not answer:
-            answer = data.get("output", data.get("result", data))
-            if isinstance(answer, list):
-                if len(answer) == 1 and isinstance(answer[0], dict):
-                    answer = answer[0].get("content") or answer[0].get("text") or str(answer[0])
+            answer = self._unwrap_api_repr(data)
+            if not answer:
+                answer = data.get("output", data.get("result", data))
+                if isinstance(answer, list):
+                    if len(answer) == 1 and isinstance(answer[0], dict):
+                        answer = answer[0].get("content") or answer[0].get("text") or str(answer[0])
+                    else:
+                        answer = "".join(
+                            item.get("content") if isinstance(item, dict) else str(item)
+                            for item in answer
+                        )
+                elif isinstance(answer, dict):
+                    answer = answer.get("content") or answer.get("text") or str(answer)
                 else:
-                    answer = "".join(
-                        item.get("content") if isinstance(item, dict) else str(item)
-                        for item in answer
-                    )
-            elif isinstance(answer, dict):
-                answer = answer.get("content") or answer.get("text") or str(answer)
-            else:
-                answer = str(answer)
+                    answer = str(answer)
 
         # Normalize and unwrap any API reprs (dicts, lists, or stringified dicts)
         answer = self._unwrap_api_repr(answer)
