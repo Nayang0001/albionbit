@@ -1,0 +1,12 @@
+{
+  "Flamígero": {
+    "categoria": "Flamígero",
+    "emoji": "🔥",
+    "cantidad": 1
+  },
+  "Tank": {
+    "categoria": "Tank",
+    "emoji": "🛡️",
+    "cantidad": 1
+  }
+}

@@ -1,0 +1,43 @@
+import asyncio
+import discord
+from discord.ext import commands
+from config import TOKEN
+from database.database import db
+from cogs.afk import AFK_GUILD_ID
+
+intents = discord.Intents.all()
+intents.message_content = True
+
+bot = commands.Bot(
+    command_prefix="!",
+    intents=intents
+)
+
+
+@bot.event
+async def on_ready():
+
+    db.crear_tablas()
+
+    print("=" * 40)
+    print(f"Bot conectado como {bot.user}")
+    print("=" * 40)
+
+    synced = await bot.tree.sync()
+    afk_synced = await bot.tree.sync(guild=discord.Object(id=AFK_GUILD_ID))
+
+    print(f"Slash Commands globales: {len(synced)} | AFK: {len(afk_synced)}")
+
+
+async def main():
+    async with bot:
+
+        # Cargar los módulos (Cogs)
+        await bot.load_extension("cogs.aventura")
+        await bot.load_extension("cogs.afk")
+        await bot.load_extension("cogs.redsec_chat")
+
+        await bot.start(TOKEN)
+
+
+asyncio.run(main())

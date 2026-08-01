@@ -1,0 +1,174 @@
+{
+  "403367357919264770": {
+    "Gank": {
+      "DPS": {
+        "arma": "Double Daggers",
+        "categoria": "DPS"
+      },
+      "Agarre": {
+        "arma": "Heavy Mace",
+        "categoria": "Agarre"
+      },
+      "garras": {
+        "arma": "Bear Paws",
+        "categoria": "garras"
+      },
+      "infernal": {
+        "arma": "Infernal Staff",
+        "categoria": "infernal"
+      },
+      "Healer": {
+        "arma": "Gran bastón sagrado",
+        "categoria": "Healer"
+      }
+    },
+    "Roaming": {
+      "Puller": {
+        "arma": "Grailseeker",
+        "categoria": "Puller"
+      },
+      "Clapper": {
+        "arma": "Galatine Pair",
+        "categoria": "Clapper"
+      },
+      "DPS": {
+        "arma": "Badon",
+        "categoria": "DPS"
+      }
+    },
+    "ZvZ": {
+      "DPS": {
+        "arma": "BEAR PAWNS",
+        "categoria": "DPS"
+      }
+    },
+    "Facciones": {
+      "Healer": {
+        "arma": "Holy Staff",
+        "categoria": "Healer"
+      },
+      "DPS": {
+        "arma": "Manos infernales",
+        "categoria": "DPS"
+      },
+      "Support": {
+        "arma": "Bastón enigmático",
+        "categoria": "Support"
+      },
+      "Clapper": {
+        "arma": "Ballesta",
+        "categoria": "Clapper"
+      }
+    },
+    "Estáticas": {
+      "Healer": {
+        "arma": "Bastón sagrado",
+        "categoria": "Healer"
+      },
+      "Stopper": {
+        "arma": "Hoja gemela fantasma",
+        "categoria": "Stopper"
+      },
+      "DPS": {
+        "arma": "Espada de talla",
+        "categoria": "DPS"
+      }
+    }
+  },
+  "1128384393434628206": {
+    "Facciones": {
+      "Tank": {
+        "arma": "Grovekeeper",
+        "categoria": "Tank"
+      }
+    },
+    "Gank": {
+      "DPS": {
+        "arma": "Espada de talla",
+        "categoria": "DPS"
+      }
+    }
+  },
+  "833561271902142484": {
+    "Facciones": {
+      "DPS": {
+        "arma": "Infernal Staff",
+        "categoria": "DPS"
+      }
+    }
+  },
+  "1038321855800545300": {
+    "Facciones": {
+      "Stopper": {
+        "arma": "Great Hammer",
+        "categoria": "Stopper"
+      }
+    }
+  },
+  "1333527218143498372": {
+    "Facciones": {
+      "Support": {
+        "arma": "JURADORES",
+        "categoria": "Support"
+      }
+    },
+    "Gank": {
+      "DPS": {
+        "arma": "Deathgivers",
+        "categoria": "DPS"
+      }
+    },
+    "Roaming": {
+      "Holy": {
+        "arma": "Hallowfall",
+        "categoria": "Holy"
+      }
+    }
+  },
+  "744976523894980699": {
+    "Facciones": {
+      "Healer": {
+        "arma": "Hallowfall",
+        "categoria": "Healer"
+      }
+    },
+    "Gank": {
+      "DPS": {
+        "arma": "Bloodletter",
+        "categoria": "DPS"
+      }
+    }
+  },
+  "752762696268775434": {
+    "Facciones": {
+      "Support": {
+        "arma": "Enraizado",
+        "categoria": "Support"
+      },
+      "Clapper": {
+        "arma": "Maza de Camlann",
+        "categoria": "Clapper"
+      }
+    }
+  },
+  "1321956794494488620": {
+    "Gank": {
+      "DPS": {
+        "arma": "Patas de oso",
+        "categoria": "DPS"
+      }
+    }
+  },
+  "515989800956723227": {
+    "Gank": {
+      "DPS": {
+        "arma": "grito gelido",
+        "categoria": "DPS"
+      },
+      "Stopper": {
+        "arma": "Hoja gemela fantasma",
+        "categoria": "Stopper"
+      }
+    }
+  }
+}

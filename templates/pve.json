@@ -1,0 +1,32 @@
+{
+    "Grupales": [
+        "Tanque",
+        "Sanador",
+        "Llamador sombrio",
+        "Flamígero",
+        "Badon"
+    ],
+    "Estática": [
+        "Tanque",
+        "Sanador",
+        "Llamador sombrio",
+        "DPS",
+        "DPS",
+        "DPS",
+        "Stopper"
+    ],
+    "Buffo Avaloniano": [
+        "Tanque",
+        "Sanador",
+        "Sanador",
+        "Sanador",
+        "Monje Negro",
+        "Invocador de Luz",
+        "Grito Gélido",
+        "Incontrolable",
+        "Ártico",
+        "Flamígero",
+        "Canción",
+        "Lanzasaetas"
+    ]
+}

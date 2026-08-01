@@ -1,0 +1,55 @@
+{
+    "Roaming": [
+        "Puller",
+        "Clapper",
+        "Stopper",
+        "Sagrado",
+        "Naturaleza",
+        "DPS",
+        "DPS",
+        "DPS",
+        "Pierce"
+    ],
+    "Gank": [
+        "Agarre",
+        "Agarre",
+        "Agarre",
+        "Sanador",
+        "DPS",
+        "DPS",
+        "DPS",
+        "DPS",
+        "DPS"
+    ],
+    "Small Scale": [
+        "Tanque",
+        "Sagrado",
+        "Naturaleza",
+        "DPS",
+        "DPS",
+        "DPS",
+        "Apoyo"
+    ],
+    "Facciones": [
+        "Tanque",
+        "Sagrado",
+        "Naturaleza",
+        "Stopper",
+        "Prisma",
+        "DPS",
+        "DPS",
+        "DPS",
+        "Pierce"
+    ],
+    "patata": [
+        "Agarre",
+        "Agarre",
+        "Agarre",
+        "Sanador",
+        "Bear Paws",
+        "Deathgivers",
+        "Double Daggers",
+        "Bloodletter",
+        "DPS"
+    ]
+}
