@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = {
     "role": "system",
     "content": (
-        "Eres Albionbot, el asistente oficial de Albion Party Manager. "
+        "Eres Rey, el asistente oficial de Albion Party Manager. "
         "Responde siempre en español, de forma breve, precisa y centrada en datos del juego. "
         "No des consejos extra, estrategias fuera del juego, ni opiniones personales. "
         "Usa frases cortas y listas cuando sea posible. Evita texto largo; sé conciso."
@@ -30,7 +30,7 @@ MAX_RESPONSE_CHARS = 800
 DISCORD_MAX_MESSAGE_LENGTH = 2000
 
 
-class AlbionbotChat(commands.Cog):
+class ReyChat(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -43,7 +43,7 @@ class AlbionbotChat(commands.Cog):
             asyncio.create_task(self.session.close())
 
     def _clean_prompt(self, content: str) -> str:
-        prompt = re.sub(r"(?i)\balbionbot\b", "", content).strip()
+        prompt = re.sub(r"(?i)\brey\b", "", content).strip()
         return prompt or "Hola"
 
     def _get_conversation(self, channel_id: int) -> list[dict[str, str]]:
@@ -232,7 +232,7 @@ class AlbionbotChat(commands.Cog):
             return
 
         content = message.content or ""
-        if "albionbot" not in content.lower():
+        if "rey" not in content.lower():
             await self.bot.process_commands(message)
             return
 
@@ -245,14 +245,14 @@ class AlbionbotChat(commands.Cog):
 
         if not content.strip():
             await message.channel.send(
-                "⚠️ No pude leer el texto de tu mensaje. Activa el Message Content Intent en Discord Developer Portal o usa `/albionbot`."
+                "⚠️ No pude leer el texto de tu mensaje. Activa el Message Content Intent en Discord Developer Portal o usa `/rey`."
             )
             await self.bot.process_commands(message)
             return
 
-        if content.strip().lower() == "albionbot":
+        if content.strip().lower() == "rey":
             await message.channel.send(
-                "🤖 Hola, soy Albionbot. Escribe tu pregunta o mensaje después de 'albionbot' y te respondo."
+                "🤖 Hola, soy Rey. Escribe tu pregunta o mensaje después de 'rey' y te respondo."
             )
             await self.bot.process_commands(message)
             return
@@ -279,9 +279,9 @@ class AlbionbotChat(commands.Cog):
         await self.bot.process_commands(message)
 
     @app_commands.guilds(discord.Object(id=AFK_GUILD_ID))
-    @app_commands.command(name="albionbot", description="Habla con Albionbot, el asistente del clan")
-    @app_commands.describe(prompt="Escribe tu pregunta o mensaje para Albionbot")
-    async def albionbot(self, interaction: discord.Interaction, prompt: str):
+    @app_commands.command(name="rey", description="Habla con Rey, el asistente del clan")
+    @app_commands.describe(prompt="Escribe tu pregunta o mensaje para Rey")
+    async def rey(self, interaction: discord.Interaction, prompt: str):
         if not self.api_key:
             await interaction.response.send_message(
                 "🤖 La IA no está configurada: falta la clave de Groq.", ephemeral=True
@@ -420,7 +420,7 @@ class AlbionbotChat(commands.Cog):
             return False
 
         embed = discord.Embed(color=0x3498DB)
-        embed.title = title or "Albionbot — Build"
+        embed.title = title or "Rey — Build"
         desc_lines = []
         for i, (k, v) in enumerate(fields[:10]):
             # Add as field when not too long
@@ -450,4 +450,4 @@ class AlbionbotChat(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(AlbionbotChat(bot))
+    await bot.add_cog(ReyChat(bot))
