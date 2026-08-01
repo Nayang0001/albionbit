@@ -5,6 +5,9 @@ from config import TOKEN
 from database.database import db
 from cogs.afk import AFK_GUILD_ID
 
+if not TOKEN:
+    raise RuntimeError("Falta el token de Discord. Define DISCORD_TOKEN o TOKEN en el entorno o .env")
+
 intents = discord.Intents.all()
 intents.message_content = True
 
