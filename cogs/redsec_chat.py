@@ -5,6 +5,7 @@ import aiohttp
 import ast
 import json
 import discord
+from contextlib import suppress
 from discord import app_commands
 from discord.ext import commands
 
@@ -41,28 +42,28 @@ DISCORD_MAX_MESSAGE_LENGTH = 2000
 BUILD_RESPONSES = {
     "healer": (
         "Build {tier} Healer\n"
-        "Arma: Holy Staff\n"
-        "Armadura: Cleric Robe\n"
-        "Casco: Cleric Hood\n"
-        "Guantes: Cleric Gloves\n"
-        "Botas: Cleric Sandals\n"
+        "Arma: Holy Staff {tier}\n"
+        "Armadura: Cleric Robe {tier}\n"
+        "Casco: Cleric Hood {tier}\n"
+        "Guantes: Cleric Gloves {tier}\n"
+        "Botas: Cleric Sandals {tier}\n"
         "Accesorios: Healing Potions, comida adecuada para el tier y runas de regeneración."
     ),
     "tank": (
         "Build {tier} Tank\n"
-        "Arma: Incubus Mace\n"
-        "Escudo: Stone Shield\n"
-        "Armadura: Guardian Armor\n"
-        "Casco: Guardian Helmet\n"
-        "Botas: Guardian Boots\n"
+        "Arma: Incubus Mace {tier}\n"
+        "Escudo: Stone Shield {tier}\n"
+        "Armadura: Guardian Armor {tier}\n"
+        "Casco: Guardian Helmet {tier}\n"
+        "Botas: Guardian Boots {tier}\n"
         "Accesorios: Defense Potions, comida de tanque y runas de resistencia."
     ),
     "dps": (
         "Build {tier} DPS\n"
-        "Arma: Bear Paws\n"
-        "Armadura: Hunter Jacket\n"
-        "Casco: Hunter Hood\n"
-        "Botas: Hunter Shoes\n"
+        "Arma: Bear Paws {tier}\n"
+        "Armadura: Hunter Jacket {tier}\n"
+        "Casco: Hunter Hood {tier}\n"
+        "Botas: Hunter Shoes {tier}\n"
         "Accesorios: Poison Pots, comida adecuada para el tier y runas de daño."
     ),
 }
@@ -171,26 +172,34 @@ class ReyChat(commands.Cog):
         if self.session is None:
             raise RuntimeError("Falta la sesión HTTP para Groq.")
 
-        url = GROQ_API_URL.format(model=GROQ_MODEL)
-        payload = {
-            "model": GROQ_MODEL,
-            "messages": messages,
-            "max_tokens": MAX_TOKENS,
-            "temperature": 0.8,
-        }
+        url = GROQ_API_URL
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
-        try:
-            data = await self._post_groq_request(url, payload, headers)
-        except RuntimeError as exc:
-            if "model_not_found" in str(exc).lower():
-                raise RuntimeError(
-                    f"Modelo Groq no encontrado ({GROQ_MODEL}). Revisa GROQ_MODEL y utiliza un modelo válido de Groq."
-                ) from exc
-            raise
+        models = [GROQ_MODEL] + [m for m in GROQ_MODEL_FALLBACKS if m != GROQ_MODEL]
+        last_model_error: str | None = None
+        for model in models:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "max_tokens": MAX_TOKENS,
+                "temperature": 0.8,
+            }
+            try:
+                data = await self._post_groq_request(url, payload, headers)
+                break
+            except RuntimeError as exc:
+                if "model_not_found" in str(exc).lower():
+                    last_model_error = f"{model}: {exc}"
+                    continue
+                raise
+        else:
+            raise RuntimeError(
+                f"Ningún modelo Groq disponible. Intenté: {', '.join(models)}. "
+                f"Último error: {last_model_error or 'sin detalles'}"
+            )
 
         answer = None
         if "choices" in data and isinstance(data["choices"], list) and data["choices"]:
@@ -274,7 +283,7 @@ class ReyChat(commands.Cog):
             try:
                 s = str(obj).strip()
                 return s or None
-            except Exception:
+            except (TypeError, ValueError):
                 return None
 
         # If it's already structured, try recursive extraction
@@ -291,11 +300,11 @@ class ReyChat(commands.Cog):
             # Try JSON first
             try:
                 obj = json.loads(s)
-            except Exception:
+            except json.JSONDecodeError:
                 # Try literal_eval for python reprs
                 try:
                     obj = ast.literal_eval(s)
-                except Exception:
+                except (ValueError, SyntaxError):
                     obj = None
 
             if obj is not None:
@@ -306,7 +315,7 @@ class ReyChat(commands.Cog):
             # As last resort, remove obvious whitespace and truncate long strings
             short = re.sub(r"\s{2,}", " ", s)
             if len(short) > 1000:
-                short = short[:1000] + "..."
+                short = f"{short[:1000]}..."
             return short
 
         return ""
@@ -353,10 +362,14 @@ class ReyChat(commands.Cog):
 
             try:
                 answer = await self._generate_response(conversation)
-            except Exception as exc:
+            except (RuntimeError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 logger.exception("Error al generar respuesta de IA")
                 hint = self._get_groq_error_hint(exc)
-                await message.channel.send(f"⚠️ {hint}")
+                error_text = f"⚠️ Rey no pudo generar la respuesta. {hint}"
+                try:
+                    await message.author.send(error_text)
+                except discord.HTTPException:
+                    logger.warning("No se pudo enviar el error por DM a %s", message.author)
                 await self.bot.process_commands(message)
                 return
 
@@ -389,10 +402,21 @@ class ReyChat(commands.Cog):
 
             try:
                 answer = await self._generate_response(conversation)
-            except Exception as exc:
+            except (RuntimeError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 logger.exception("Error al generar respuesta de IA para slash command")
                 hint = self._get_groq_error_hint(exc)
-                await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
+                error_text = f"⚠️ Rey no pudo generar la respuesta. {hint}"
+                try:
+                    await interaction.user.send(error_text)
+                    await interaction.response.send_message(
+                        "He enviado el error por DM. Revisa tu bandeja privada.",
+                        ephemeral=True,
+                    )
+                except discord.HTTPException:
+                    await interaction.response.send_message(
+                        "⚠️ No pude enviarte el error por DM. Revisa tus permisos de mensaje directo.",
+                        ephemeral=True,
+                    )
                 return
 
         answer = self._sanitize_answer(answer)
@@ -456,9 +480,14 @@ class ReyChat(commands.Cog):
         for line in content.splitlines(keepends=True):
             if len(line) > DISCORD_MAX_MESSAGE_LENGTH:
                 while line:
-                    part = line[:DISCORD_MAX_MESSAGE_LENGTH - current_len]
-                    if not part:
-                        part = line[:DISCORD_MAX_MESSAGE_LENGTH]
+                    remaining = DISCORD_MAX_MESSAGE_LENGTH - current_len
+                    if remaining <= 0:
+                        chunks.append("".join(current))
+                        current = []
+                        current_len = 0
+                        remaining = DISCORD_MAX_MESSAGE_LENGTH
+
+                    part = line[:remaining]
                     current.append(part)
                     chunks.append("".join(current))
                     current = []
@@ -481,15 +510,13 @@ class ReyChat(commands.Cog):
 
     async def _try_send_as_embed(self, destination, content: str) -> bool:
         # Try to unwrap API-like reprs first
-        try:
+        with suppress(ValueError, SyntaxError, TypeError):
             content = self._unwrap_api_repr(content)
-        except Exception:
-            pass
 
         # Heurística: solo crear embed si el contenido parece realmente estructurado como build
         keywords = ("arma", "armadura", "rol", "build", "casco", "botas", "arma:")
         lower = content.lower()
-        if not any(k in lower for k in keywords):
+        if all(k not in lower for k in keywords):
             return False
 
         # Extraer pares clave: valor por línea
@@ -510,7 +537,7 @@ class ReyChat(commands.Cog):
                     fields.append((key, value))
             elif line.startswith('-') or line.startswith('*'):
                 # fallback: bullet items -> add to description
-                if len(fields) < 1:
+                if not fields:
                     fields.append(("Info", line.lstrip('-* ').strip()))
 
         if not fields:
@@ -523,11 +550,11 @@ class ReyChat(commands.Cog):
         embed = discord.Embed(color=0x3498DB)
         embed.title = title or "Rey — Build"
         desc_lines = []
-        for i, (k, v) in enumerate(fields[:10]):
+        for k, v in fields[:10]:
             # Add as field when not too long
             try:
                 embed.add_field(name=k, value=v, inline=True)
-            except Exception:
+            except ValueError:
                 desc_lines.append(f"**{k}**: {v}")
 
         if len(fields) > 10:
@@ -544,7 +571,7 @@ class ReyChat(commands.Cog):
             if isinstance(destination, discord.abc.Messageable):
                 await destination.send(embed=embed)
                 return True
-        except Exception:
+        except discord.HTTPException:
             return False
 
         return False

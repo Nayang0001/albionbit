@@ -8,8 +8,16 @@ TOKEN = (
     or os.environ.get("TOKEN")
     or ""
 ).strip()
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", os.environ.get("OPENAI_API_KEY", "")).strip()
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "grok2o-mini").strip()
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "groq2o-mini").strip()
+GROQ_MODEL_FALLBACKS = [
+    model.strip()
+    for model in os.environ.get(
+        "GROQ_MODEL_FALLBACKS",
+        "groq2o-mini,groq2o-base,groq2o-instruct",
+    ).split(",")
+    if model.strip()
+]
 GROQ_API_URL = os.environ.get(
     "GROQ_API_URL",
     "https://api.groq.com/openai/v1/chat/completions",
