@@ -357,7 +357,11 @@ class ReyChat(commands.Cog):
             except (RuntimeError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 logger.exception("Error al generar respuesta de IA")
                 hint = self._get_groq_error_hint(exc)
-                await message.channel.send(f"⚠️ {hint}")
+                error_text = f"⚠️ Rey no pudo generar la respuesta. {hint}"
+                try:
+                    await message.author.send(error_text)
+                except discord.HTTPException:
+                    logger.warning("No se pudo enviar el error por DM a %s", message.author)
                 await self.bot.process_commands(message)
                 return
 

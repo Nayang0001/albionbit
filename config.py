@@ -8,7 +8,7 @@ TOKEN = (
     or os.environ.get("TOKEN")
     or ""
 ).strip()
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", os.environ.get("OPENAI_API_KEY", "")).strip()
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "grok2o-mini").strip()
 GROQ_API_URL = os.environ.get(
     "GROQ_API_URL",
