@@ -14,7 +14,7 @@ GROQ_MODEL_FALLBACKS = [
     model.strip()
     for model in os.environ.get(
         "GROQ_MODEL_FALLBACKS",
-        "groq2o-mini,groq2o-base,groq2o-instruct",
+        "groq2o-mini,groq2o-base,groq2o-instruct,gpt-4o-mini,gpt-4o,gpt-3.5-turbo",
     ).split(",")
     if model.strip()
 ]

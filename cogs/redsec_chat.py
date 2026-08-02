@@ -149,8 +149,8 @@ class ReyChat(commands.Cog):
 
     def _get_groq_error_hint(self, exc: Exception) -> str:
         text = str(exc).lower()
-        if "api key" in text or "unauthorized" in text or "401" in text or "forbidden" in text:
-            return "La clave de Groq no está autorizada o no se cargó correctamente. Revisa la variable GROQ_API_KEY."
+        if "api key" in text or "unauthorized" in text or "401" in text or "403" in text or "forbidden" in text or "error code: 1010" in text:
+            return "La clave de Groq no está autorizada o no se cargó correctamente. Revisa la variable GROQ_API_KEY y tu acceso a Groq."
         if "quota" in text or "429" in text:
             return "Groq rechazó la solicitud por cuota o límite. Intenta de nuevo más tarde."
         if self._is_groq_model_not_found(exc):
@@ -163,7 +163,7 @@ class ReyChat(commands.Cog):
 
     def _is_groq_model_not_found(self, exc: Exception) -> bool:
         text = str(exc).lower()
-        if "model_not_found" in text or ("model" in text and "not found" in text):
+        if "model_not_found" in text or ("model" in text and "not found" in text) or "does not exist" in text:
             return True
         return False
 
