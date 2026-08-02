@@ -18,11 +18,10 @@ def _build_system_prompt() -> str:
     return (
         "Eres Rey, el asistente oficial de Albion Party Manager para Albion Online. "
         "Responde siempre en español, de forma breve, precisa y centrada en datos reales del juego. "
-        "Si te preguntan por builds, roles, armas, armaduras o composiciones de grupo, usa nombres reales de Albion Online. "
-        "Ejemplo de respuesta para una build T4.2 de healer: 'Build T4.2 Healer: Hallowfall, Scholar Robe, Scholar Sandals, Scholar Hood, Healing Potions'. "
+        "Cuando te pregunten por builds T4.2 de healer, tank o dps, responde con nombres reales de ítems del juego como Hallowfall, Scholar Robe, Scholar Hood, Scholar Sandals, Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Incubus Mace, Stone Shield, Guardian Armor, Guardian Helmet y Guardian Boots. "
+        "Ejemplo de respuesta para una build T4.2 de healer: 'Build T4.2 Healer: Hallowfall, Scholar Robe, Scholar Hood, Scholar Sandals, Healing Potions'. "
         "Ejemplo de respuesta para una build T4.2 de DPS: 'Build T4.2 DPS: Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Poison Pots'. "
-        "Siempre utiliza ítems reales como Grailseeker, Spirit Hunter, Bear Paws, Hallowfall, Blight Staff, Heavy Mace, Incubus Mace, Great Holy, Longbow, Badon, Bridled Fury, Bloodletter, Deathgivers, Galatine Pair, Carving Sword, Bow of Badon, Scholar Robe, Scholar Hood y Scholar Sandals. "
-        "No inventes ítems, roles ni nombres. Si no tienes una referencia fiable, indica que no está disponible en tu base de datos de Albion. "
+        "No inventes ítems, roles ni nombres. Si no tienes una referencia fiable, responde que no tienes datos concretos del juego en este momento. "
         "No digas que eres ChatGPT, OpenAI, Grok, Claude ni un modelo genérico; actúa solo como Rey. "
         "No des opiniones personales ni consejos fuera del juego. Usa frases cortas y listas cuando sea posible."
     )
@@ -38,6 +37,34 @@ MAX_HISTORY_MESSAGES = 12
 MAX_TOKENS = 300
 MAX_RESPONSE_CHARS = 800
 DISCORD_MAX_MESSAGE_LENGTH = 2000
+
+BUILD_RESPONSES = {
+    "healer": (
+        "Build T4.2 Healer\n"
+        "Arma: Hallowfall\n"
+        "Armadura: Scholar Robe\n"
+        "Casco: Scholar Hood\n"
+        "Botas: Scholar Sandals\n"
+        "Accesorios: Healing Potions, Tier 4 food y runas de regeneración."
+    ),
+    "tank": (
+        "Build T4.2 Tank\n"
+        "Arma: Incubus Mace\n"
+        "Escudo: Stone Shield\n"
+        "Armadura: Guardian Armor\n"
+        "Casco: Guardian Helmet\n"
+        "Botas: Guardian Boots\n"
+        "Accesorios: Defense Potions, comida de tanque y runas de resistencia."
+    ),
+    "dps": (
+        "Build T4.2 DPS\n"
+        "Arma: Bear Paws\n"
+        "Armadura: Hunter Jacket\n"
+        "Casco: Hunter Hood\n"
+        "Botas: Hunter Shoes\n"
+        "Accesorios: Poison Pots, Tier 4 food y runas de daño."
+    ),
+}
 
 
 class ReyChat(commands.Cog):
@@ -73,6 +100,21 @@ class ReyChat(commands.Cog):
         text = re.sub(r"(?i)\b(?:chatgpt|gpt[- ]?\d|openai|grok|claude)\b", "", text)
         text = re.sub(r"\s{2,}", " ", text).strip()
         return text or "Soy Rey."
+
+    def _get_build_response(self, prompt: str) -> str | None:
+        lower = prompt.lower()
+        if "build" not in lower and "constru" not in lower:
+            return None
+        if not any(token in lower for token in ("t4.2", "t4 2", "tier 4.2", "t4")):
+            return None
+
+        if "healer" in lower or "heal" in lower or "sanador" in lower:
+            return BUILD_RESPONSES["healer"]
+        if "tank" in lower or "tanque" in lower:
+            return BUILD_RESPONSES["tank"]
+        if "dps" in lower or "daño" in lower or "damage" in lower:
+            return BUILD_RESPONSES["dps"]
+        return None
 
     def _get_conversation(self, channel_id: int) -> list[dict[str, str]]:
         conversation = self.conversations.get(channel_id)
@@ -293,17 +335,22 @@ class ReyChat(commands.Cog):
             return
 
         prompt = self._clean_prompt(content)
-        conversation = self._get_conversation(message.channel.id)
-        conversation.append({"role": "user", "content": prompt})
+        local_answer = self._get_build_response(prompt)
+        if local_answer is not None:
+            answer = local_answer
+            conversation = self._get_conversation(message.channel.id)
+        else:
+            conversation = self._get_conversation(message.channel.id)
+            conversation.append({"role": "user", "content": prompt})
 
-        try:
-            answer = await self._generate_response(conversation)
-        except Exception as exc:
-            logger.exception("Error al generar respuesta de IA")
-            hint = self._get_groq_error_hint(exc)
-            await message.channel.send(f"⚠️ {hint}")
-            await self.bot.process_commands(message)
-            return
+            try:
+                answer = await self._generate_response(conversation)
+            except Exception as exc:
+                logger.exception("Error al generar respuesta de IA")
+                hint = self._get_groq_error_hint(exc)
+                await message.channel.send(f"⚠️ {hint}")
+                await self.bot.process_commands(message)
+                return
 
         answer = self._sanitize_answer(answer)
         # Shorten answer to a concise, game-accurate form to avoid truncation
@@ -324,16 +371,21 @@ class ReyChat(commands.Cog):
             )
             return
 
-        conversation = self._get_conversation(interaction.channel.id)
-        conversation.append({"role": "user", "content": prompt})
+        local_answer = self._get_build_response(prompt)
+        if local_answer is not None:
+            answer = local_answer
+            conversation = self._get_conversation(interaction.channel.id)
+        else:
+            conversation = self._get_conversation(interaction.channel.id)
+            conversation.append({"role": "user", "content": prompt})
 
-        try:
-            answer = await self._generate_response(conversation)
-        except Exception as exc:
-            logger.exception("Error al generar respuesta de IA para slash command")
-            hint = self._get_groq_error_hint(exc)
-            await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
-            return
+            try:
+                answer = await self._generate_response(conversation)
+            except Exception as exc:
+                logger.exception("Error al generar respuesta de IA para slash command")
+                hint = self._get_groq_error_hint(exc)
+                await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
+                return
 
         answer = self._sanitize_answer(answer)
         answer = self._shorten_answer(answer)

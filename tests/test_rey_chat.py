@@ -21,3 +21,27 @@ class ReyChatTests(unittest.TestCase):
         self.assertIn("Albion Online", prompt)
         self.assertIn("Grailseeker", prompt)
         self.assertIn("Spirit Hunter", prompt)
+
+    def test_get_build_response_for_healer_t4_2(self):
+        chat = ReyChat.__new__(ReyChat)
+        result = chat._get_build_response("dime una build para healer t4.2")
+
+        self.assertIsNotNone(result)
+        self.assertIn("Hallowfall", result)
+        self.assertIn("Scholar Robe", result)
+
+    def test_get_build_response_for_tank_t4_2(self):
+        chat = ReyChat.__new__(ReyChat)
+        result = chat._get_build_response("¿me das una build de tank t4.2?")
+
+        self.assertIsNotNone(result)
+        self.assertIn("Incubus Mace", result)
+        self.assertIn("Guardian Armor", result)
+
+    def test_get_build_response_for_dps_t4_2(self):
+        chat = ReyChat.__new__(ReyChat)
+        result = chat._get_build_response("build t4.2 dps")
+
+        self.assertIsNotNone(result)
+        self.assertIn("Bear Paws", result)
+        self.assertIn("Hunter Jacket", result)
