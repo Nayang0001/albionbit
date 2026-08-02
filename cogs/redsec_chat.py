@@ -174,15 +174,11 @@ class ReyChat(commands.Cog):
         try:
             data = await self._post_groq_request(url, payload, headers)
         except RuntimeError as exc:
-            if "model_not_found" in str(exc).lower() and GROQ_MODEL != "openai/gpt-oss-20b":
-                logger.warning(
-                    "Modelo Groq no encontrado (%s). Reintentando con openai/gpt-oss-20b.",
-                    GROQ_MODEL,
-                )
-                payload["model"] = "openai/gpt-oss-20b"
-                data = await self._post_groq_request(url, payload, headers)
-            else:
-                raise
+            if "model_not_found" in str(exc).lower():
+                raise RuntimeError(
+                    f"Modelo Groq no encontrado ({GROQ_MODEL}). Revisa GROQ_MODEL y utiliza un modelo válido de Groq."
+                ) from exc
+            raise
 
         answer = None
         if "choices" in data and isinstance(data["choices"], list) and data["choices"]:
