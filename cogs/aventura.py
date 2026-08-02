@@ -55,6 +55,8 @@ class Aventura(commands.Cog):
             ("Panamá (UTC-5)", -5),
             ("México (UTC-6)", -6),
             ("República Dominicana (UTC-4)", -4),
+            ("Colombia (UTC-5)", -5),
+            ("Argentina (UTC-3)", -3),
         )
         lineas = [
             f"**{nombre}:** {ahora_utc.astimezone(timezone(timedelta(hours=desfase))):%I:%M:%S %p}"
@@ -62,7 +64,7 @@ class Aventura(commands.Cog):
         ]
         timestamp = int(ahora_utc.timestamp())
         embed = discord.Embed(
-            title="🕒 Horario de Albion y Centroamérica",
+            title="🕒 Horario de Albion, Centroamérica y Sudamérica",
             description="\n".join(lineas) + f"\n\nActualizado: <t:{timestamp}:R>",
             color=0x3498DB,
         )
