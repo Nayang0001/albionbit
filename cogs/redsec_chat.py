@@ -153,7 +153,7 @@ class ReyChat(commands.Cog):
             return "La clave de Groq no está autorizada o no se cargó correctamente. Revisa la variable GROQ_API_KEY."
         if "quota" in text or "429" in text:
             return "Groq rechazó la solicitud por cuota o límite. Intenta de nuevo más tarde."
-        if "model" in text and "not found" in text:
+        if self._is_groq_model_not_found(exc):
             return "El modelo de Groq no está disponible. Revisa GROQ_MODEL."
         if isinstance(exc, aiohttp.ClientConnectorError):
             return "No se pudo conectar a Groq. Revisa la conexión de red."
@@ -161,11 +161,27 @@ class ReyChat(commands.Cog):
             return "La conexión con Groq tardó demasiado. Intenta de nuevo más tarde."
         return "Hubo un error al comunicarse con Groq. Revisa la configuración y la red."
 
+    def _is_groq_model_not_found(self, exc: Exception) -> bool:
+        text = str(exc).lower()
+        if "model_not_found" in text or ("model" in text and "not found" in text):
+            return True
+        return False
+
     async def _post_groq_request(self, url: str, payload: dict, headers: dict) -> dict:
         async with self.session.post(url, json=payload, headers=headers, timeout=60) as response:
             body = await response.text()
             if response.status != 200:
-                raise RuntimeError(f"Groq API {response.status}: {body}")
+                error_message = body
+                try:
+                    error_payload = json.loads(body)
+                    error = error_payload.get("error", {})
+                    message = error.get("message")
+                    code = error.get("code")
+                    if code or message:
+                        error_message = " ".join(str(x).strip() for x in (code, message) if x)
+                except json.JSONDecodeError:
+                    pass
+                raise RuntimeError(f"Groq API {response.status}: {error_message}")
             return await response.json()
 
     async def _generate_groq_response(self, messages: list[dict[str, str]]) -> str:
@@ -191,7 +207,7 @@ class ReyChat(commands.Cog):
                 data = await self._post_groq_request(url, payload, headers)
                 break
             except RuntimeError as exc:
-                if "model_not_found" in str(exc).lower():
+                if self._is_groq_model_not_found(exc):
                     last_model_error = f"{model}: {exc}"
                     continue
                 raise
