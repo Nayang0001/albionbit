@@ -13,14 +13,24 @@ from config import GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL
 
 logger = logging.getLogger(__name__)
 
+
+def _build_system_prompt() -> str:
+    return (
+        "Eres Rey, el asistente oficial de Albion Party Manager para Albion Online. "
+        "Responde siempre en español, de forma breve, precisa y centrada en datos reales del juego. "
+        "Si te preguntan por builds, roles, armas, armaduras o composiciones de grupo, usa nombres reales de Albion Online. "
+        "Ejemplo de respuesta para una build T4.2 de healer: 'Build T4.2 Healer: Hallowfall, Scholar Robe, Scholar Sandals, Scholar Hood, Healing Potions'. "
+        "Ejemplo de respuesta para una build T4.2 de DPS: 'Build T4.2 DPS: Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Poison Pots'. "
+        "Siempre utiliza ítems reales como Grailseeker, Spirit Hunter, Bear Paws, Hallowfall, Blight Staff, Heavy Mace, Incubus Mace, Great Holy, Longbow, Badon, Bridled Fury, Bloodletter, Deathgivers, Galatine Pair, Carving Sword, Bow of Badon, Scholar Robe, Scholar Hood y Scholar Sandals. "
+        "No inventes ítems, roles ni nombres. Si no tienes una referencia fiable, indica que no está disponible en tu base de datos de Albion. "
+        "No digas que eres ChatGPT, OpenAI, Grok, Claude ni un modelo genérico; actúa solo como Rey. "
+        "No des opiniones personales ni consejos fuera del juego. Usa frases cortas y listas cuando sea posible."
+    )
+
+
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": (
-        "Eres Rey, el asistente oficial de Albion Party Manager. "
-        "Responde siempre en español, de forma breve, precisa y centrada en datos del juego. "
-        "No des consejos extra, estrategias fuera del juego, ni opiniones personales. "
-        "Usa frases cortas y listas cuando sea posible. Evita texto largo; sé conciso."
-    ),
+    "content": _build_system_prompt(),
 }
 
 MAX_HISTORY_MESSAGES = 12
@@ -31,6 +41,10 @@ DISCORD_MAX_MESSAGE_LENGTH = 2000
 
 
 class ReyChat(commands.Cog):
+
+    @staticmethod
+    def _build_system_prompt() -> str:
+        return _build_system_prompt()
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -45,6 +59,20 @@ class ReyChat(commands.Cog):
     def _clean_prompt(self, content: str) -> str:
         prompt = re.sub(r"(?i)\brey\b", "", content).strip()
         return prompt or "Hola"
+
+    def _sanitize_answer(self, text: str) -> str:
+        if not text:
+            return ""
+
+        text = text.strip()
+        text = re.sub(
+            r"(?i)\b(?:soy|i am)\s+(?:chatgpt|gpt[- ]?\d|openai|grok|claude)\b[^.?!]*[.?!]?",
+            "Soy Rey.",
+            text,
+        )
+        text = re.sub(r"(?i)\b(?:chatgpt|gpt[- ]?\d|openai|grok|claude)\b", "", text)
+        text = re.sub(r"\s{2,}", " ", text).strip()
+        return text or "Soy Rey."
 
     def _get_conversation(self, channel_id: int) -> list[dict[str, str]]:
         conversation = self.conversations.get(channel_id)
@@ -118,26 +146,15 @@ class ReyChat(commands.Cog):
         if "choices" in data and isinstance(data["choices"], list) and data["choices"]:
             choice = data["choices"][0]
             if isinstance(choice, dict):
-                message = choice.get("message") or {}
+                message = choice.get("message")
                 if isinstance(message, dict):
                     answer = message.get("content") or message.get("text")
-                answer = answer or choice.get("text")
+                if answer is None:
+                    answer = choice.get("text")
         if not answer:
             answer = self._unwrap_api_repr(data)
-            if not answer:
-                answer = data.get("output", data.get("result", data))
-                if isinstance(answer, list):
-                    if len(answer) == 1 and isinstance(answer[0], dict):
-                        answer = answer[0].get("content") or answer[0].get("text") or str(answer[0])
-                    else:
-                        answer = "".join(
-                            item.get("content") if isinstance(item, dict) else str(item)
-                            for item in answer
-                        )
-                elif isinstance(answer, dict):
-                    answer = answer.get("content") or answer.get("text") or str(answer)
-                else:
-                    answer = str(answer)
+        if not answer:
+            raise RuntimeError("No se pudo extraer una respuesta de la API de Groq.")
 
         # Normalize and unwrap any API reprs (dicts, lists, or stringified dicts)
         answer = self._unwrap_api_repr(answer)
@@ -148,7 +165,19 @@ class ReyChat(commands.Cog):
 
         Accepts dict, list, or string representations and returns a cleaned string.
         """
-        EXCLUDE_KEYS = {"reasoning", "debug", "logprobs"}
+        EXCLUDE_KEYS = {
+            "reasoning",
+            "debug",
+            "logprobs",
+            "id",
+            "object",
+            "model",
+            "created",
+            "usage",
+            "type",
+            "index",
+            "finish_reason",
+        }
 
         def recursive_find_text(obj):
             """Recursively search for the first non-empty string value in obj.
@@ -276,6 +305,7 @@ class ReyChat(commands.Cog):
             await self.bot.process_commands(message)
             return
 
+        answer = self._sanitize_answer(answer)
         # Shorten answer to a concise, game-accurate form to avoid truncation
         answer = self._shorten_answer(answer)
         conversation.append({"role": "assistant", "content": answer})
@@ -305,6 +335,7 @@ class ReyChat(commands.Cog):
             await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
             return
 
+        answer = self._sanitize_answer(answer)
         answer = self._shorten_answer(answer)
         conversation.append({"role": "assistant", "content": answer})
         self._trim_conversation(interaction.channel.id)
@@ -395,7 +426,7 @@ class ReyChat(commands.Cog):
         except Exception:
             pass
 
-        # Heurística: si el contenido contiene claves típicas de build (Arma, Armadura, Rol)
+        # Heurística: solo crear embed si el contenido parece realmente estructurado como build
         keywords = ("arma", "armadura", "rol", "build", "casco", "botas", "arma:")
         lower = content.lower()
         if not any(k in lower for k in keywords):
@@ -423,6 +454,10 @@ class ReyChat(commands.Cog):
                     fields.append(("Info", line.lstrip('-* ').strip()))
 
         if not fields:
+            return False
+
+        # Require a strong structure before using embed formatting
+        if len(fields) < 3 and title is None:
             return False
 
         embed = discord.Embed(color=0x3498DB)
