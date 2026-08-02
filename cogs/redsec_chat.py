@@ -18,9 +18,9 @@ def _build_system_prompt() -> str:
     return (
         "Eres Rey, el asistente oficial de Albion Party Manager para Albion Online. "
         "Responde siempre en español, de forma breve, precisa y centrada en datos reales del juego. "
-        "Cuando te pregunten por builds T4.2 de healer, tank o dps, responde con nombres reales de ítems del juego como Hallowfall, Scholar Robe, Scholar Hood, Scholar Sandals, Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Incubus Mace, Stone Shield, Guardian Armor, Guardian Helmet y Guardian Boots. "
-        "Ejemplo de respuesta para una build T4.2 de healer: 'Build T4.2 Healer: Hallowfall, Scholar Robe, Scholar Hood, Scholar Sandals, Healing Potions'. "
-        "Ejemplo de respuesta para una build T4.2 de DPS: 'Build T4.2 DPS: Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Poison Pots'. "
+        "Cuando te pregunten por builds de healer, tank o dps, responde con nombres reales de ítems del juego como Holy Staff, Cleric Hood, Cleric Robe, Cleric Gloves, Cleric Sandals, Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Incubus Mace, Stone Shield, Guardian Armor, Guardian Helmet y Guardian Boots. "
+        "Ejemplo de respuesta para una build de healer: 'Build T5 Healer: Holy Staff, Cleric Hood, Cleric Robe, Cleric Gloves, Cleric Sandals, Healing Potions'. "
+        "Ejemplo de respuesta para una build de DPS: 'Build T6 DPS: Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Poison Pots'. "
         "No inventes ítems, roles ni nombres. Si no tienes una referencia fiable, responde que no tienes datos concretos del juego en este momento. "
         "No digas que eres ChatGPT, OpenAI, Grok, Claude ni un modelo genérico; actúa solo como Rey. "
         "No des opiniones personales ni consejos fuera del juego. Usa frases cortas y listas cuando sea posible."
@@ -40,15 +40,16 @@ DISCORD_MAX_MESSAGE_LENGTH = 2000
 
 BUILD_RESPONSES = {
     "healer": (
-        "Build T4.2 Healer\n"
-        "Arma: Hallowfall\n"
-        "Armadura: Scholar Robe\n"
-        "Casco: Scholar Hood\n"
-        "Botas: Scholar Sandals\n"
-        "Accesorios: Healing Potions, Tier 4 food y runas de regeneración."
+        "Build {tier} Healer\n"
+        "Arma: Holy Staff\n"
+        "Armadura: Cleric Robe\n"
+        "Casco: Cleric Hood\n"
+        "Guantes: Cleric Gloves\n"
+        "Botas: Cleric Sandals\n"
+        "Accesorios: Healing Potions, comida adecuada para el tier y runas de regeneración."
     ),
     "tank": (
-        "Build T4.2 Tank\n"
+        "Build {tier} Tank\n"
         "Arma: Incubus Mace\n"
         "Escudo: Stone Shield\n"
         "Armadura: Guardian Armor\n"
@@ -57,14 +58,16 @@ BUILD_RESPONSES = {
         "Accesorios: Defense Potions, comida de tanque y runas de resistencia."
     ),
     "dps": (
-        "Build T4.2 DPS\n"
+        "Build {tier} DPS\n"
         "Arma: Bear Paws\n"
         "Armadura: Hunter Jacket\n"
         "Casco: Hunter Hood\n"
         "Botas: Hunter Shoes\n"
-        "Accesorios: Poison Pots, Tier 4 food y runas de daño."
+        "Accesorios: Poison Pots, comida adecuada para el tier y runas de daño."
     ),
 }
+
+TIER_PATTERN = re.compile(r"\b(?:t(?:ier)?\s*\.?\s*(\d+(?:\.\d+)?))\b", re.IGNORECASE)
 
 
 class ReyChat(commands.Cog):
@@ -101,19 +104,28 @@ class ReyChat(commands.Cog):
         text = re.sub(r"\s{2,}", " ", text).strip()
         return text or "Soy Rey."
 
+    def _extract_requested_tier(self, prompt: str) -> str | None:
+        match = TIER_PATTERN.search(prompt)
+        if not match:
+            return None
+        tier = match.group(1).replace(" ", "")
+        return f"T{tier}"
+
     def _get_build_response(self, prompt: str) -> str | None:
         lower = prompt.lower()
         if "build" not in lower and "constru" not in lower:
             return None
-        if not any(token in lower for token in ("t4.2", "t4 2", "tier 4.2", "t4")):
+
+        tier = self._extract_requested_tier(prompt)
+        if tier is None:
             return None
 
-        if "healer" in lower or "heal" in lower or "sanador" in lower:
-            return BUILD_RESPONSES["healer"]
+        if "healer" in lower or "heal" in lower or "sanador" in lower or "curador" in lower:
+            return BUILD_RESPONSES["healer"].format(tier=tier)
         if "tank" in lower or "tanque" in lower:
-            return BUILD_RESPONSES["tank"]
+            return BUILD_RESPONSES["tank"].format(tier=tier)
         if "dps" in lower or "daño" in lower or "damage" in lower:
-            return BUILD_RESPONSES["dps"]
+            return BUILD_RESPONSES["dps"].format(tier=tier)
         return None
 
     def _get_conversation(self, channel_id: int) -> list[dict[str, str]]:

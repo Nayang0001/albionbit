@@ -19,16 +19,16 @@ class ReyChatTests(unittest.TestCase):
         prompt = ReyChat._build_system_prompt()
 
         self.assertIn("Albion Online", prompt)
-        self.assertIn("Grailseeker", prompt)
-        self.assertIn("Spirit Hunter", prompt)
+        self.assertIn("Holy Staff", prompt)
+        self.assertIn("Cleric Robe", prompt)
 
     def test_get_build_response_for_healer_t4_2(self):
         chat = ReyChat.__new__(ReyChat)
         result = chat._get_build_response("dime una build para healer t4.2")
 
         self.assertIsNotNone(result)
-        self.assertIn("Hallowfall", result)
-        self.assertIn("Scholar Robe", result)
+        self.assertIn("Holy Staff", result)
+        self.assertIn("Cleric Robe", result)
 
     def test_get_build_response_for_tank_t4_2(self):
         chat = ReyChat.__new__(ReyChat)
