@@ -10,7 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.afk import AFK_GUILD_ID
-from config import GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL
+from config import GROQ_API_KEY, GROQ_MODEL, GROQ_MODEL_FALLBACKS, GROQ_API_URL
 
 logger = logging.getLogger(__name__)
 
