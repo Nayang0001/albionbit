@@ -13,14 +13,23 @@ from config import GROQ_API_KEY, GROQ_MODEL, GROQ_API_URL
 
 logger = logging.getLogger(__name__)
 
+
+def _build_system_prompt() -> str:
+    return (
+        "Eres Rey, el asistente oficial de Albion Party Manager para Albion Online. "
+        "Responde siempre en español, de forma breve, precisa y centrada en datos reales del juego. "
+        "Cuando te pregunten por builds de healer, tank o dps, responde con nombres reales de ítems del juego como Holy Staff, Cleric Hood, Cleric Robe, Cleric Gloves, Cleric Sandals, Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Incubus Mace, Stone Shield, Guardian Armor, Guardian Helmet y Guardian Boots. "
+        "Ejemplo de respuesta para una build de healer: 'Build T5 Healer: Holy Staff, Cleric Hood, Cleric Robe, Cleric Gloves, Cleric Sandals, Healing Potions'. "
+        "Ejemplo de respuesta para una build de DPS: 'Build T6 DPS: Bear Paws, Hunter Jacket, Hunter Hood, Hunter Shoes, Poison Pots'. "
+        "No inventes ítems, roles ni nombres. Si no tienes una referencia fiable, responde que no tienes datos concretos del juego en este momento. "
+        "No digas que eres ChatGPT, OpenAI, Grok, Claude ni un modelo genérico; actúa solo como Rey. "
+        "No des opiniones personales ni consejos fuera del juego. Usa frases cortas y listas cuando sea posible."
+    )
+
+
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": (
-        "Eres Rey, el asistente oficial de Albion Party Manager. "
-        "Responde siempre en español, de forma breve, precisa y centrada en datos del juego. "
-        "No des consejos extra, estrategias fuera del juego, ni opiniones personales. "
-        "Usa frases cortas y listas cuando sea posible. Evita texto largo; sé conciso."
-    ),
+    "content": _build_system_prompt(),
 }
 
 MAX_HISTORY_MESSAGES = 12
@@ -29,8 +38,43 @@ MAX_TOKENS = 300
 MAX_RESPONSE_CHARS = 800
 DISCORD_MAX_MESSAGE_LENGTH = 2000
 
+BUILD_RESPONSES = {
+    "healer": (
+        "Build {tier} Healer\n"
+        "Arma: Holy Staff\n"
+        "Armadura: Cleric Robe\n"
+        "Casco: Cleric Hood\n"
+        "Guantes: Cleric Gloves\n"
+        "Botas: Cleric Sandals\n"
+        "Accesorios: Healing Potions, comida adecuada para el tier y runas de regeneración."
+    ),
+    "tank": (
+        "Build {tier} Tank\n"
+        "Arma: Incubus Mace\n"
+        "Escudo: Stone Shield\n"
+        "Armadura: Guardian Armor\n"
+        "Casco: Guardian Helmet\n"
+        "Botas: Guardian Boots\n"
+        "Accesorios: Defense Potions, comida de tanque y runas de resistencia."
+    ),
+    "dps": (
+        "Build {tier} DPS\n"
+        "Arma: Bear Paws\n"
+        "Armadura: Hunter Jacket\n"
+        "Casco: Hunter Hood\n"
+        "Botas: Hunter Shoes\n"
+        "Accesorios: Poison Pots, comida adecuada para el tier y runas de daño."
+    ),
+}
+
+TIER_PATTERN = re.compile(r"\b(?:t(?:ier)?\s*\.?\s*(\d+(?:\.\d+)?))\b", re.IGNORECASE)
+
 
 class ReyChat(commands.Cog):
+
+    @staticmethod
+    def _build_system_prompt() -> str:
+        return _build_system_prompt()
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -45,6 +89,44 @@ class ReyChat(commands.Cog):
     def _clean_prompt(self, content: str) -> str:
         prompt = re.sub(r"(?i)\brey\b", "", content).strip()
         return prompt or "Hola"
+
+    def _sanitize_answer(self, text: str) -> str:
+        if not text:
+            return ""
+
+        text = text.strip()
+        text = re.sub(
+            r"(?i)\b(?:soy|i am)\s+(?:chatgpt|gpt[- ]?\d|openai|grok|claude)\b[^.?!]*[.?!]?",
+            "Soy Rey.",
+            text,
+        )
+        text = re.sub(r"(?i)\b(?:chatgpt|gpt[- ]?\d|openai|grok|claude)\b", "", text)
+        text = re.sub(r"\s{2,}", " ", text).strip()
+        return text or "Soy Rey."
+
+    def _extract_requested_tier(self, prompt: str) -> str | None:
+        match = TIER_PATTERN.search(prompt)
+        if not match:
+            return None
+        tier = match.group(1).replace(" ", "")
+        return f"T{tier}"
+
+    def _get_build_response(self, prompt: str) -> str | None:
+        lower = prompt.lower()
+        if "build" not in lower and "constru" not in lower:
+            return None
+
+        tier = self._extract_requested_tier(prompt)
+        if tier is None:
+            return None
+
+        if "healer" in lower or "heal" in lower or "sanador" in lower or "curador" in lower:
+            return BUILD_RESPONSES["healer"].format(tier=tier)
+        if "tank" in lower or "tanque" in lower:
+            return BUILD_RESPONSES["tank"].format(tier=tier)
+        if "dps" in lower or "daño" in lower or "damage" in lower:
+            return BUILD_RESPONSES["dps"].format(tier=tier)
+        return None
 
     def _get_conversation(self, channel_id: int) -> list[dict[str, str]]:
         conversation = self.conversations.get(channel_id)
@@ -104,40 +186,25 @@ class ReyChat(commands.Cog):
         try:
             data = await self._post_groq_request(url, payload, headers)
         except RuntimeError as exc:
-            if "model_not_found" in str(exc).lower() and GROQ_MODEL != "openai/gpt-oss-20b":
-                logger.warning(
-                    "Modelo Groq no encontrado (%s). Reintentando con openai/gpt-oss-20b.",
-                    GROQ_MODEL,
-                )
-                payload["model"] = "openai/gpt-oss-20b"
-                data = await self._post_groq_request(url, payload, headers)
-            else:
-                raise
+            if "model_not_found" in str(exc).lower():
+                raise RuntimeError(
+                    f"Modelo Groq no encontrado ({GROQ_MODEL}). Revisa GROQ_MODEL y utiliza un modelo válido de Groq."
+                ) from exc
+            raise
 
         answer = None
         if "choices" in data and isinstance(data["choices"], list) and data["choices"]:
             choice = data["choices"][0]
             if isinstance(choice, dict):
-                message = choice.get("message") or {}
+                message = choice.get("message")
                 if isinstance(message, dict):
                     answer = message.get("content") or message.get("text")
-                answer = answer or choice.get("text")
+                if answer is None:
+                    answer = choice.get("text")
         if not answer:
             answer = self._unwrap_api_repr(data)
-            if not answer:
-                answer = data.get("output", data.get("result", data))
-                if isinstance(answer, list):
-                    if len(answer) == 1 and isinstance(answer[0], dict):
-                        answer = answer[0].get("content") or answer[0].get("text") or str(answer[0])
-                    else:
-                        answer = "".join(
-                            item.get("content") if isinstance(item, dict) else str(item)
-                            for item in answer
-                        )
-                elif isinstance(answer, dict):
-                    answer = answer.get("content") or answer.get("text") or str(answer)
-                else:
-                    answer = str(answer)
+        if not answer:
+            raise RuntimeError("No se pudo extraer una respuesta de la API de Groq.")
 
         # Normalize and unwrap any API reprs (dicts, lists, or stringified dicts)
         answer = self._unwrap_api_repr(answer)
@@ -148,7 +215,19 @@ class ReyChat(commands.Cog):
 
         Accepts dict, list, or string representations and returns a cleaned string.
         """
-        EXCLUDE_KEYS = {"reasoning", "debug", "logprobs"}
+        EXCLUDE_KEYS = {
+            "reasoning",
+            "debug",
+            "logprobs",
+            "id",
+            "object",
+            "model",
+            "created",
+            "usage",
+            "type",
+            "index",
+            "finish_reason",
+        }
 
         def recursive_find_text(obj):
             """Recursively search for the first non-empty string value in obj.
@@ -264,18 +343,24 @@ class ReyChat(commands.Cog):
             return
 
         prompt = self._clean_prompt(content)
-        conversation = self._get_conversation(message.channel.id)
-        conversation.append({"role": "user", "content": prompt})
+        local_answer = self._get_build_response(prompt)
+        if local_answer is not None:
+            answer = local_answer
+            conversation = self._get_conversation(message.channel.id)
+        else:
+            conversation = self._get_conversation(message.channel.id)
+            conversation.append({"role": "user", "content": prompt})
 
-        try:
-            answer = await self._generate_response(conversation)
-        except Exception as exc:
-            logger.exception("Error al generar respuesta de IA")
-            hint = self._get_groq_error_hint(exc)
-            await message.channel.send(f"⚠️ {hint}")
-            await self.bot.process_commands(message)
-            return
+            try:
+                answer = await self._generate_response(conversation)
+            except Exception as exc:
+                logger.exception("Error al generar respuesta de IA")
+                hint = self._get_groq_error_hint(exc)
+                await message.channel.send(f"⚠️ {hint}")
+                await self.bot.process_commands(message)
+                return
 
+        answer = self._sanitize_answer(answer)
         # Shorten answer to a concise, game-accurate form to avoid truncation
         answer = self._shorten_answer(answer)
         conversation.append({"role": "assistant", "content": answer})
@@ -294,17 +379,23 @@ class ReyChat(commands.Cog):
             )
             return
 
-        conversation = self._get_conversation(interaction.channel.id)
-        conversation.append({"role": "user", "content": prompt})
+        local_answer = self._get_build_response(prompt)
+        if local_answer is not None:
+            answer = local_answer
+            conversation = self._get_conversation(interaction.channel.id)
+        else:
+            conversation = self._get_conversation(interaction.channel.id)
+            conversation.append({"role": "user", "content": prompt})
 
-        try:
-            answer = await self._generate_response(conversation)
-        except Exception as exc:
-            logger.exception("Error al generar respuesta de IA para slash command")
-            hint = self._get_groq_error_hint(exc)
-            await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
-            return
+            try:
+                answer = await self._generate_response(conversation)
+            except Exception as exc:
+                logger.exception("Error al generar respuesta de IA para slash command")
+                hint = self._get_groq_error_hint(exc)
+                await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
+                return
 
+        answer = self._sanitize_answer(answer)
         answer = self._shorten_answer(answer)
         conversation.append({"role": "assistant", "content": answer})
         self._trim_conversation(interaction.channel.id)
@@ -395,7 +486,7 @@ class ReyChat(commands.Cog):
         except Exception:
             pass
 
-        # Heurística: si el contenido contiene claves típicas de build (Arma, Armadura, Rol)
+        # Heurística: solo crear embed si el contenido parece realmente estructurado como build
         keywords = ("arma", "armadura", "rol", "build", "casco", "botas", "arma:")
         lower = content.lower()
         if not any(k in lower for k in keywords):
@@ -423,6 +514,10 @@ class ReyChat(commands.Cog):
                     fields.append(("Info", line.lstrip('-* ').strip()))
 
         if not fields:
+            return False
+
+        # Require a strong structure before using embed formatting
+        if len(fields) < 3 and title is None:
             return False
 
         embed = discord.Embed(color=0x3498DB)
