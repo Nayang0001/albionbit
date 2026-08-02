@@ -214,7 +214,8 @@ class ReyChat(commands.Cog):
         else:
             raise RuntimeError(
                 f"Ningún modelo Groq disponible. Intenté: {', '.join(models)}. "
-                f"Último error: {last_model_error or 'sin detalles'}"
+                f"Último error: {last_model_error or 'sin detalles'}. "
+                "Revisa tu clave de Groq y los permisos de modelo en console.groq.com."
             )
 
         answer = None
