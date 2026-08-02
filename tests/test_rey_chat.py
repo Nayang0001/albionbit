@@ -27,8 +27,16 @@ class ReyChatTests(unittest.TestCase):
         result = chat._get_build_response("dime una build para healer t4.2")
 
         self.assertIsNotNone(result)
-        self.assertIn("Holy Staff", result)
-        self.assertIn("Cleric Robe", result)
+        self.assertIn("Holy Staff T4.2", result)
+        self.assertIn("Cleric Robe T4.2", result)
+
+    def test_get_build_response_for_healer_t4_1(self):
+        chat = ReyChat.__new__(ReyChat)
+        result = chat._get_build_response("dime una build para healer t4.1")
+
+        self.assertIsNotNone(result)
+        self.assertIn("Holy Staff T4.1", result)
+        self.assertIn("Cleric Robe T4.1", result)
 
     def test_get_build_response_for_tank_t4_2(self):
         chat = ReyChat.__new__(ReyChat)

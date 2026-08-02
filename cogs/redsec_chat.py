@@ -41,28 +41,28 @@ DISCORD_MAX_MESSAGE_LENGTH = 2000
 BUILD_RESPONSES = {
     "healer": (
         "Build {tier} Healer\n"
-        "Arma: Holy Staff\n"
-        "Armadura: Cleric Robe\n"
-        "Casco: Cleric Hood\n"
-        "Guantes: Cleric Gloves\n"
-        "Botas: Cleric Sandals\n"
+        "Arma: Holy Staff {tier}\n"
+        "Armadura: Cleric Robe {tier}\n"
+        "Casco: Cleric Hood {tier}\n"
+        "Guantes: Cleric Gloves {tier}\n"
+        "Botas: Cleric Sandals {tier}\n"
         "Accesorios: Healing Potions, comida adecuada para el tier y runas de regeneración."
     ),
     "tank": (
         "Build {tier} Tank\n"
-        "Arma: Incubus Mace\n"
-        "Escudo: Stone Shield\n"
-        "Armadura: Guardian Armor\n"
-        "Casco: Guardian Helmet\n"
-        "Botas: Guardian Boots\n"
+        "Arma: Incubus Mace {tier}\n"
+        "Escudo: Stone Shield {tier}\n"
+        "Armadura: Guardian Armor {tier}\n"
+        "Casco: Guardian Helmet {tier}\n"
+        "Botas: Guardian Boots {tier}\n"
         "Accesorios: Defense Potions, comida de tanque y runas de resistencia."
     ),
     "dps": (
         "Build {tier} DPS\n"
-        "Arma: Bear Paws\n"
-        "Armadura: Hunter Jacket\n"
-        "Casco: Hunter Hood\n"
-        "Botas: Hunter Shoes\n"
+        "Arma: Bear Paws {tier}\n"
+        "Armadura: Hunter Jacket {tier}\n"
+        "Casco: Hunter Hood {tier}\n"
+        "Botas: Hunter Shoes {tier}\n"
         "Accesorios: Poison Pots, comida adecuada para el tier y runas de daño."
     ),
 }
