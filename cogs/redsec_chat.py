@@ -173,25 +173,33 @@ class ReyChat(commands.Cog):
             raise RuntimeError("Falta la sesión HTTP para Groq.")
 
         url = GROQ_API_URL
-        payload = {
-            "model": GROQ_MODEL,
-            "messages": messages,
-            "max_tokens": MAX_TOKENS,
-            "temperature": 0.8,
-        }
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
 
-        try:
-            data = await self._post_groq_request(url, payload, headers)
-        except RuntimeError as exc:
-            if "model_not_found" in str(exc).lower():
-                raise RuntimeError(
-                    f"Modelo Groq no encontrado ({GROQ_MODEL}). Revisa GROQ_MODEL y utiliza un modelo válido de Groq."
-                ) from exc
-            raise
+        models = [GROQ_MODEL] + [m for m in GROQ_MODEL_FALLBACKS if m != GROQ_MODEL]
+        last_model_error: str | None = None
+        for model in models:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "max_tokens": MAX_TOKENS,
+                "temperature": 0.8,
+            }
+            try:
+                data = await self._post_groq_request(url, payload, headers)
+                break
+            except RuntimeError as exc:
+                if "model_not_found" in str(exc).lower():
+                    last_model_error = f"{model}: {exc}"
+                    continue
+                raise
+        else:
+            raise RuntimeError(
+                f"Ningún modelo Groq disponible. Intenté: {', '.join(models)}. "
+                f"Último error: {last_model_error or 'sin detalles'}"
+            )
 
         answer = None
         if "choices" in data and isinstance(data["choices"], list) and data["choices"]:
@@ -397,7 +405,18 @@ class ReyChat(commands.Cog):
             except (RuntimeError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 logger.exception("Error al generar respuesta de IA para slash command")
                 hint = self._get_groq_error_hint(exc)
-                await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
+                error_text = f"⚠️ Rey no pudo generar la respuesta. {hint}"
+                try:
+                    await interaction.user.send(error_text)
+                    await interaction.response.send_message(
+                        "He enviado el error por DM. Revisa tu bandeja privada.",
+                        ephemeral=True,
+                    )
+                except discord.HTTPException:
+                    await interaction.response.send_message(
+                        "⚠️ No pude enviarte el error por DM. Revisa tus permisos de mensaje directo.",
+                        ephemeral=True,
+                    )
                 return
 
         answer = self._sanitize_answer(answer)
