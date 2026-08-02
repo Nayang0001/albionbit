@@ -5,6 +5,7 @@ import aiohttp
 import ast
 import json
 import discord
+from contextlib import suppress
 from discord import app_commands
 from discord.ext import commands
 
@@ -171,7 +172,7 @@ class ReyChat(commands.Cog):
         if self.session is None:
             raise RuntimeError("Falta la sesión HTTP para Groq.")
 
-        url = GROQ_API_URL.format(model=GROQ_MODEL)
+        url = GROQ_API_URL
         payload = {
             "model": GROQ_MODEL,
             "messages": messages,
@@ -274,7 +275,7 @@ class ReyChat(commands.Cog):
             try:
                 s = str(obj).strip()
                 return s or None
-            except Exception:
+            except (TypeError, ValueError):
                 return None
 
         # If it's already structured, try recursive extraction
@@ -291,11 +292,11 @@ class ReyChat(commands.Cog):
             # Try JSON first
             try:
                 obj = json.loads(s)
-            except Exception:
+            except json.JSONDecodeError:
                 # Try literal_eval for python reprs
                 try:
                     obj = ast.literal_eval(s)
-                except Exception:
+                except (ValueError, SyntaxError):
                     obj = None
 
             if obj is not None:
@@ -306,7 +307,7 @@ class ReyChat(commands.Cog):
             # As last resort, remove obvious whitespace and truncate long strings
             short = re.sub(r"\s{2,}", " ", s)
             if len(short) > 1000:
-                short = short[:1000] + "..."
+                short = f"{short[:1000]}..."
             return short
 
         return ""
@@ -353,7 +354,7 @@ class ReyChat(commands.Cog):
 
             try:
                 answer = await self._generate_response(conversation)
-            except Exception as exc:
+            except (RuntimeError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 logger.exception("Error al generar respuesta de IA")
                 hint = self._get_groq_error_hint(exc)
                 await message.channel.send(f"⚠️ {hint}")
@@ -389,7 +390,7 @@ class ReyChat(commands.Cog):
 
             try:
                 answer = await self._generate_response(conversation)
-            except Exception as exc:
+            except (RuntimeError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 logger.exception("Error al generar respuesta de IA para slash command")
                 hint = self._get_groq_error_hint(exc)
                 await interaction.response.send_message(f"⚠️ {hint}", ephemeral=True)
@@ -456,9 +457,14 @@ class ReyChat(commands.Cog):
         for line in content.splitlines(keepends=True):
             if len(line) > DISCORD_MAX_MESSAGE_LENGTH:
                 while line:
-                    part = line[:DISCORD_MAX_MESSAGE_LENGTH - current_len]
-                    if not part:
-                        part = line[:DISCORD_MAX_MESSAGE_LENGTH]
+                    remaining = DISCORD_MAX_MESSAGE_LENGTH - current_len
+                    if remaining <= 0:
+                        chunks.append("".join(current))
+                        current = []
+                        current_len = 0
+                        remaining = DISCORD_MAX_MESSAGE_LENGTH
+
+                    part = line[:remaining]
                     current.append(part)
                     chunks.append("".join(current))
                     current = []
@@ -481,15 +487,13 @@ class ReyChat(commands.Cog):
 
     async def _try_send_as_embed(self, destination, content: str) -> bool:
         # Try to unwrap API-like reprs first
-        try:
+        with suppress(ValueError, SyntaxError, TypeError):
             content = self._unwrap_api_repr(content)
-        except Exception:
-            pass
 
         # Heurística: solo crear embed si el contenido parece realmente estructurado como build
         keywords = ("arma", "armadura", "rol", "build", "casco", "botas", "arma:")
         lower = content.lower()
-        if not any(k in lower for k in keywords):
+        if all(k not in lower for k in keywords):
             return False
 
         # Extraer pares clave: valor por línea
@@ -510,7 +514,7 @@ class ReyChat(commands.Cog):
                     fields.append((key, value))
             elif line.startswith('-') or line.startswith('*'):
                 # fallback: bullet items -> add to description
-                if len(fields) < 1:
+                if not fields:
                     fields.append(("Info", line.lstrip('-* ').strip()))
 
         if not fields:
@@ -523,11 +527,11 @@ class ReyChat(commands.Cog):
         embed = discord.Embed(color=0x3498DB)
         embed.title = title or "Rey — Build"
         desc_lines = []
-        for i, (k, v) in enumerate(fields[:10]):
+        for k, v in fields[:10]:
             # Add as field when not too long
             try:
                 embed.add_field(name=k, value=v, inline=True)
-            except Exception:
+            except ValueError:
                 desc_lines.append(f"**{k}**: {v}")
 
         if len(fields) > 10:
@@ -544,7 +548,7 @@ class ReyChat(commands.Cog):
             if isinstance(destination, discord.abc.Messageable):
                 await destination.send(embed=embed)
                 return True
-        except Exception:
+        except discord.HTTPException:
             return False
 
         return False
