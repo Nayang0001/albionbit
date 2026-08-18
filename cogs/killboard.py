@@ -71,9 +71,14 @@ class Killboard(commands.Cog):
 
                 sent = False
 
-                is_kill = bool(killer and str(killer.get("GuildId")) == str(albion_guild_id))
-                is_death = bool(victim and str(victim.get("GuildId")) == str(albion_guild_id))
+                killer_gid = str(killer.get("GuildId")) if killer.get("GuildId") else None
+                victim_gid = str(victim.get("GuildId")) if victim.get("GuildId") else None
+                
+                is_kill = bool(killer and killer_gid == str(albion_guild_id))
+                is_death = bool(victim and victim_gid == str(albion_guild_id))
+                
                 if not (is_kill or is_death):
+                    LOGGER.debug(f"EventId {event_id}: Killer Guild={killer_gid}, Victim Guild={victim_gid}, Target={albion_guild_id}")
                     continue
 
                 self.last_matching_events += 1
