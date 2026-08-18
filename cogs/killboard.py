@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -20,6 +21,9 @@ class Killboard(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.albion = AlbionService()
+        self.last_poll_at: datetime | None = None
+        self.last_event_count = 0
+        self.last_matching_events = 0
         self._task = bot.loop.create_task(self._poll_loop())
 
     async def _poll_loop(self):
@@ -39,6 +43,9 @@ class Killboard(commands.Cog):
             return
 
         events = await self.albion.fetch_events(limit=50)
+        self.last_poll_at = datetime.now(timezone.utc)
+        self.last_event_count = len(events)
+        self.last_matching_events = 0
 
         for row in rows:
             guild_id = row[0]
@@ -65,6 +72,8 @@ class Killboard(commands.Cog):
                 is_death = bool(victim and victim.get("GuildId") == albion_guild_id)
                 if not (is_kill or is_death):
                     continue
+
+                self.last_matching_events += 1
 
                 event = await self.albion.get_event(str(event_id)) or ev
 
@@ -250,6 +259,16 @@ class KillboardSetup(commands.GroupCog, group_name="killboard", group_descriptio
 
         channel_kills, channel_deaths, albion_guild_id = row[0], row[1], row[2]
         text = f"Guild Albion ID: {albion_guild_id}\nCanal kills: {channel_kills}\nCanal deaths: {channel_deaths}"
+        killboard = self.bot.get_cog("Killboard")
+        if killboard and killboard.last_poll_at:
+            checked_at = killboard.last_poll_at.strftime("%H:%M:%S UTC")
+            text += (
+                f"\n\nUltima consulta: {checked_at}"
+                f"\nEventos recibidos: {killboard.last_event_count}"
+                f"\nEventos de esta guild: {killboard.last_matching_events}"
+            )
+        else:
+            text += "\n\nEl killboard aun no ha completado su primera consulta."
         await interaction.response.send_message(text, ephemeral=True)
 
 
