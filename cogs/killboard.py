@@ -94,35 +94,35 @@ class Killboard(commands.Cog):
 
                     sent = False
 
-                killer_gid = str(killer.get("GuildId")) if killer.get("GuildId") else None
-                victim_gid = str(victim.get("GuildId")) if victim.get("GuildId") else None
-                
-                is_kill = bool(killer and killer_gid == str(albion_guild_id))
-                is_death = bool(victim and victim_gid == str(albion_guild_id))
-                
-                if not (is_kill or is_death):
-                    LOGGER.debug(f"EventId {event_id}: Killer Guild={killer_gid}, Victim Guild={victim_gid}, Target={albion_guild_id}")
-                    continue
+                    killer_gid = str(killer.get("GuildId")) if killer.get("GuildId") else None
+                    victim_gid = str(victim.get("GuildId")) if victim.get("GuildId") else None
+                    
+                    is_kill = bool(killer and killer_gid == str(albion_guild_id))
+                    is_death = bool(victim and victim_gid == str(albion_guild_id))
+                    
+                    if not (is_kill or is_death):
+                        LOGGER.debug(f"EventId {event_id}: Killer Guild={killer_gid}, Victim Guild={victim_gid}, Target={albion_guild_id}")
+                        continue
 
-                self.last_matching_events += 1
-                LOGGER.info(f"Evento coincidente encontrado: Kill={is_kill}, Death={is_death}, EventId={event_id}")
+                    self.last_matching_events += 1
+                    LOGGER.info(f"Evento coincidente encontrado: Kill={is_kill}, Death={is_death}, EventId={event_id}")
 
-                event = await self.albion.get_event(str(event_id)) or ev
+                    event = await albion.get_event(str(event_id)) or ev
 
-                if is_kill:
-                    await self._send_event(channel_kills, event, "kill", guild_id)
-                    sent = True
+                    if is_kill:
+                        await self._send_event(channel_kills, event, "kill", guild_id)
+                        sent = True
 
-                if is_death:
-                    await self._send_event(channel_deaths, event, "death", guild_id)
-                    sent = True
+                    if is_death:
+                        await self._send_event(channel_deaths, event, "death", guild_id)
+                        sent = True
 
-                if sent:
-                    cur.execute(
-                        "INSERT OR IGNORE INTO killboard_events (event_id, guild_id, event_type) VALUES (?,?,?)",
-                        (event_id, guild_id, 'kill' if killer.get("GuildId") == albion_guild_id else 'death'),
-                    )
-                    db.conn.commit()
+                    if sent:
+                        cur.execute(
+                            "INSERT OR IGNORE INTO killboard_events (event_id, guild_id, event_type) VALUES (?,?,?)",
+                            (event_id, guild_id, 'kill' if killer.get("GuildId") == albion_guild_id else 'death'),
+                        )
+                        db.conn.commit()
 
     async def _send_event(self, channel_id, ev, ev_type: str, guild_id: int):
         if not channel_id:
