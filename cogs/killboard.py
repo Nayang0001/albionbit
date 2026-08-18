@@ -187,13 +187,12 @@ class Killboard(commands.Cog):
         await channel.send(embed=embed)
 
 
-class KillboardSetup(commands.Cog):
-    """Comandos para configurar el killboard por servidor."""
+class KillboardSetup(commands.GroupCog, group_name="killboard", group_description="Comandos para configurar el killboard"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="killboard-track", description="Trackear kills/deaths de una guild de Albion")
+    @app_commands.command(name="track", description="Trackear kills/deaths de una guild de Albion")
     @app_commands.describe(albion_guild_id="ID de la guild en Albion (GuildId)", channel_kills="Canal para kills", channel_deaths="Canal para deaths (opcional)")
     async def track(self, interaction: discord.Interaction, albion_guild_id: str, channel_kills: discord.TextChannel, channel_deaths: discord.TextChannel | None=None):
         cur = db.cursor
@@ -204,14 +203,14 @@ class KillboardSetup(commands.Cog):
         db.conn.commit()
         await interaction.response.send_message("✅ Killboard configurado para esta guild.", ephemeral=True)
 
-    @app_commands.command(name="killboard-untrack", description="Dejar de trackear eventos para esta guild")
+    @app_commands.command(name="untrack", description="Dejar de trackear eventos para esta guild")
     async def untrack(self, interaction: discord.Interaction):
         cur = db.cursor
         cur.execute("DELETE FROM killboard_tracked WHERE guild_id=?", (interaction.guild_id,))
         db.conn.commit()
         await interaction.response.send_message("✅ Killboard desactivado para esta guild.", ephemeral=True)
 
-    @app_commands.command(name="killboard-status", description="Mostrar estado del killboard para este servidor")
+    @app_commands.command(name="status", description="Mostrar estado del killboard para este servidor")
     async def status(self, interaction: discord.Interaction):
         cur = db.cursor
         cur.execute("SELECT channel_kills, channel_deaths, albion_guild_id FROM killboard_tracked WHERE guild_id=?", (interaction.guild_id,))
