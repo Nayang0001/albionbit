@@ -107,33 +107,3 @@ CREATE TABLE IF NOT EXISTS afk_records (
     PRIMARY KEY (guild_id, user_id)
 
 );
-
--- ===========================
--- Killboard
--- ===========================
-
-CREATE TABLE IF NOT EXISTS killboard_tracked (
-
-    guild_id INTEGER PRIMARY KEY,
-
-    nombre TEXT,
-
-    channel_kills INTEGER,
-
-    channel_deaths INTEGER,
-
-    albion_guild_id TEXT
-
-);
-
-CREATE TABLE IF NOT EXISTS killboard_events (
-
-    event_id TEXT PRIMARY KEY,
-
-    guild_id INTEGER,
-
-    event_type TEXT,
-
-    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-);
