@@ -40,18 +40,21 @@ class Killboard(commands.Cog):
         cur.execute("SELECT guild_id, channel_kills, channel_deaths, albion_guild_id FROM killboard_tracked")
         rows = cur.fetchall()
         if not rows:
+            LOGGER.info("No hay guilds trackeadas en killboard")
             return
 
         events = await self.albion.fetch_events(limit=50)
         self.last_poll_at = datetime.now(timezone.utc)
         self.last_event_count = len(events)
         self.last_matching_events = 0
+        LOGGER.debug(f"Obtenidos {len(events)} eventos de Albion API")
 
         for row in rows:
             guild_id = row[0]
             channel_kills = row[1]
             channel_deaths = row[2]
             albion_guild_id = row[3]
+            LOGGER.debug(f"Checkeando guild Discord {guild_id} contra Albion guild {albion_guild_id}")
 
             for ev in events:
                 event_id = ev.get("EventId") or ev.get("Id") or ev.get("Id")
@@ -68,12 +71,13 @@ class Killboard(commands.Cog):
 
                 sent = False
 
-                is_kill = bool(killer and killer.get("GuildId") == albion_guild_id)
-                is_death = bool(victim and victim.get("GuildId") == albion_guild_id)
+                is_kill = bool(killer and str(killer.get("GuildId")) == str(albion_guild_id))
+                is_death = bool(victim and str(victim.get("GuildId")) == str(albion_guild_id))
                 if not (is_kill or is_death):
                     continue
 
                 self.last_matching_events += 1
+                LOGGER.info(f"Evento coincidente encontrado: Kill={is_kill}, Death={is_death}, EventId={event_id}")
 
                 event = await self.albion.get_event(str(event_id)) or ev
 
