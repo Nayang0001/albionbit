@@ -14,6 +14,8 @@ from services.albion_service import AlbionService
 from database.database import db
 
 LOGGER = logging.getLogger("killboard")
+# Fallback guild/player names to match when GuildId is missing or inconsistent
+FALLBACK_GUILD_NAMES = ["Los Dragones del Norte"]
 
 
 class Killboard(commands.Cog):
@@ -103,12 +105,30 @@ class Killboard(commands.Cog):
                     killer_gid = str(killer.get("GuildId")) if killer.get("GuildId") else None
                     victim_gid = str(victim.get("GuildId")) if victim.get("GuildId") else None
                     
+                    # Log raw event for diagnosis
+                    LOGGER.debug(f"RawEvent {event_id}: Type={ev.get('Type')} Killer={{gid:{killer_gid},name:{killer.get('Name')}}} Victim={{gid:{victim_gid},name:{victim.get('Name')}}} Full={ev}")
+                    
                     is_kill = bool(killer and killer_gid == str(albion_guild_id))
                     is_death = bool(victim and victim_gid == str(albion_guild_id))
                     
+                    # Fallback: match by guild/player name if GuildId not present or mismatched
                     if not (is_kill or is_death):
-                        LOGGER.debug(f"EventId {event_id}: Killer Guild={killer_gid}, Victim Guild={victim_gid}, Target={albion_guild_id}")
-                        continue
+                        k_name = (killer.get("Name") or "").lower()
+                        v_name = (victim.get("Name") or "").lower()
+                        for fallback in FALLBACK_GUILD_NAMES:
+                            f = fallback.lower()
+                            if f in k_name:
+                                is_kill = True
+                                LOGGER.debug(f"Fallback match by killer name for EventId {event_id}: '{fallback}' in '{k_name}'")
+                                break
+                            if f in v_name:
+                                is_death = True
+                                LOGGER.debug(f"Fallback match by victim name for EventId {event_id}: '{fallback}' in '{v_name}'")
+                                break
+
+                        if not (is_kill or is_death):
+                            LOGGER.debug(f"EventId {event_id}: Killer Guild={killer_gid}, Victim Guild={victim_gid}, Target={albion_guild_id}")
+                            continue
 
                     self.last_matching_events += 1
                     LOGGER.info(f"Evento coincidente encontrado: Kill={is_kill}, Death={is_death}, EventId={event_id}")
