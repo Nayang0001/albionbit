@@ -28,7 +28,12 @@ class AlbionService:
 
     async def get_event(self, event_id: str):
         url = f"{BASE}/events/{event_id}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=20) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        try:
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as resp:
+                    resp.raise_for_status()
+                    return await resp.json()
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            self.logger.warning("No se pudo obtener el detalle del evento %s: %s", event_id, exc)
+            return None

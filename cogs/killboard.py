@@ -61,12 +61,19 @@ class Killboard(commands.Cog):
 
                 sent = False
 
-                if killer and killer.get("GuildId") == albion_guild_id:
-                    await self._send_event(channel_kills, ev, "kill", guild_id)
+                is_kill = bool(killer and killer.get("GuildId") == albion_guild_id)
+                is_death = bool(victim and victim.get("GuildId") == albion_guild_id)
+                if not (is_kill or is_death):
+                    continue
+
+                event = await self.albion.get_event(str(event_id)) or ev
+
+                if is_kill:
+                    await self._send_event(channel_kills, event, "kill", guild_id)
                     sent = True
 
-                if victim and victim.get("GuildId") == albion_guild_id:
-                    await self._send_event(channel_deaths, ev, "death", guild_id)
+                if is_death:
+                    await self._send_event(channel_deaths, event, "death", guild_id)
                     sent = True
 
                 if sent:
@@ -102,7 +109,13 @@ class Killboard(commands.Cog):
         # helper to extract item ids from event participant
         def extract_item_ids(part):
             items = []
-            for p in (part.get("Items") or part.get("Equipment") or []):
+            equipment = part.get("Equipment") or part.get("Items") or []
+            if isinstance(equipment, dict):
+                equipment = [
+                    equipment.get(slot)
+                    for slot in ("MainHand", "OffHand", "Head", "Armor", "Shoes", "Bag", "Cape", "Mount", "Potion", "Food")
+                ]
+            for p in equipment:
                 if isinstance(p, dict):
                     item_id = p.get("Type") or p.get("ItemType") or p.get("TypeId") or p.get("Id")
                     if item_id:
@@ -114,7 +127,7 @@ class Killboard(commands.Cog):
         k_item_ids = extract_item_ids(killer)
         v_item_ids = extract_item_ids(victim)
         loot_ids = []
-        for l in (ev.get("Loot") or []):
+        for l in (ev.get("Loot") or victim.get("Inventory") or []):
             if isinstance(l, dict):
                 lid = l.get("Type") or l.get("ItemType") or l.get("Id")
                 if lid:
@@ -156,14 +169,8 @@ class Killboard(commands.Cog):
             try:
                 img_bytes = render_kill_event(ev, ev_type, k_icons=k_icons, v_icons=v_icons, loot_icons=loot_icons)
                 file = discord.File(fp=img_bytes, filename="killcard.png")
-                embed = discord.Embed(title=title, color=color)
-                # Short info fields
-                k_name = killer.get("Name") or "Desconocido"
-                v_name = victim.get("Name") or "Desconocido"
-                embed.add_field(name="Killer", value=k_name, inline=True)
-                embed.add_field(name="Victim", value=v_name, inline=True)
-                location = ev.get("Location") or ev.get("Zone") or ev.get("ZoneId") or "-"
-                embed.set_footer(text=f"Mapa: {location} ? EventId: {ev.get('EventId') or ev.get('Id')}")
+                embed = discord.Embed(color=color)
+                embed.set_image(url="attachment://killcard.png")
                 await channel.send(embed=embed, file=file)
                 return
             except Exception:

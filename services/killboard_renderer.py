@@ -31,8 +31,10 @@ def render_kill_event(ev: dict, ev_type: str="kill", k_icons: list | None=None, 
     k_name = killer.get("Name", "Desconocido")
     v_name = victim.get("Name", "Desconocido")
 
-    title_text = f"{k_name}  ?  {v_name}"
-    draw.text((width // 2 - draw.textsize(title_text, font=title_font)[0] // 2, 18), title_text, fill=(60, 34, 20), font=title_font)
+    title_text = f"{k_name} killed {v_name}"
+    title_box = draw.textbbox((0, 0), title_text, font=title_font)
+    title_width = title_box[2] - title_box[0]
+    draw.text((width // 2 - title_width // 2, 18), title_text, fill=(60, 34, 20), font=title_font)
 
     # Left and right equipment grids (3x3)
     box_size = 84
@@ -65,10 +67,16 @@ def render_kill_event(ev: dict, ev_type: str="kill", k_icons: list | None=None, 
     # Extract simple item name lists from event participants (placeholders)
     k_items = []
     v_items = []
-    # If event has participants with Equipment, try to fill
-    for p in (killer.get("Items") or [])[:9]:
+    # Item labels are only a fallback; the real equipment icons are supplied by the caller.
+    k_equipment = killer.get("Equipment") or killer.get("Items") or []
+    v_equipment = victim.get("Equipment") or victim.get("Items") or []
+    if isinstance(k_equipment, dict):
+        k_equipment = list(k_equipment.values())
+    if isinstance(v_equipment, dict):
+        v_equipment = list(v_equipment.values())
+    for p in k_equipment[:9]:
         k_items.append(str(p))
-    for p in (victim.get("Items") or [])[:9]:
+    for p in v_equipment[:9]:
         v_items.append(str(p))
 
     draw_grid(left_x, start_y, k_items, icons=k_icons)
@@ -96,7 +104,7 @@ def render_kill_event(ev: dict, ev_type: str="kill", k_icons: list | None=None, 
     draw.text((width // 2 - 140, height - 80), str(ts), fill=(60, 40, 20), font=small_font)
 
     # Bottom row: loot placeholders
-    loot = ev.get("Loot") or []
+    loot = ev.get("Loot") or victim.get("Inventory") or []
     loot_x = 40
     loot_y = height - 160
     for i in range(10):
