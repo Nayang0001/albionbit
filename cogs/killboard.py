@@ -203,6 +203,28 @@ class KillboardSetup(commands.GroupCog, group_name="killboard", group_descriptio
         db.conn.commit()
         await interaction.response.send_message("? Killboard configurado para esta guild.", ephemeral=True)
 
+    @app_commands.command(name="deaths", description="Configurar el canal donde se publican las muertes")
+    @app_commands.describe(channel="Canal para las muertes de la guild")
+    async def deaths(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        cur = db.cursor
+        cur.execute(
+            "UPDATE killboard_tracked SET channel_deaths=? WHERE guild_id=?",
+            (channel.id, interaction.guild_id),
+        )
+        db.conn.commit()
+
+        if cur.rowcount == 0:
+            await interaction.response.send_message(
+                "Primero configura el killboard con /killboard track.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            f"Las muertes se publicarán en {channel.mention}.",
+            ephemeral=True,
+        )
+
     @app_commands.command(name="untrack", description="Dejar de trackear eventos para esta guild")
     async def untrack(self, interaction: discord.Interaction):
         cur = db.cursor
