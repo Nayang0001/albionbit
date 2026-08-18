@@ -12,4 +12,3 @@ orjson==3.11.9
 propcache==0.5.2
 python-dotenv==1.2.2
 yarl==1.24.5
-Pillow==10.1.0

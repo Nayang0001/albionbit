@@ -39,7 +39,6 @@ async def main():
         await bot.load_extension("cogs.aventura")
         await bot.load_extension("cogs.afk")
         await bot.load_extension("cogs.redsec_chat")
-        await bot.load_extension("cogs.killboard")
 
         await bot.start(TOKEN)
 
