@@ -1,3 +1,4 @@
+import asyncio
 import aiohttp
 import logging
 
@@ -11,10 +12,19 @@ class AlbionService:
 
     async def fetch_events(self, limit: int=50):
         url = f"{BASE}/events?limit={limit}"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=20) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+        timeout = aiohttp.ClientTimeout(total=15)
+
+        for attempt in range(3):
+            try:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url) as resp:
+                        resp.raise_for_status()
+                        return await resp.json()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+                if attempt == 2:
+                    self.logger.warning("No se pudieron obtener eventos de Albion: %s", exc)
+                    return []
+                await asyncio.sleep(2 * (attempt + 1))
 
     async def get_event(self, event_id: str):
         url = f"{BASE}/events/{event_id}"
