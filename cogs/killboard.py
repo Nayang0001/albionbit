@@ -20,7 +20,16 @@ class Killboard(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.albion = AlbionService()
+        self.logger = logging.getLogger("killboard")
+        
+        # Asegurar que existe la columna 'server' en la BD (migración)
+        try:
+            cur = db.cursor
+            cur.execute("ALTER TABLE killboard_tracked ADD COLUMN server TEXT DEFAULT 'europe'")
+            db.conn.commit()
+        except Exception:
+            pass  # Columna ya existe
+        
         self.last_poll_at: datetime | None = None
         self.last_event_count = 0
         self.last_matching_events = 0
@@ -37,39 +46,53 @@ class Killboard(commands.Cog):
 
     async def check_all_tracked(self):
         cur = db.cursor
-        cur.execute("SELECT guild_id, channel_kills, channel_deaths, albion_guild_id FROM killboard_tracked")
+        cur.execute("SELECT guild_id, channel_kills, channel_deaths, albion_guild_id, server FROM killboard_tracked")
         rows = cur.fetchall()
         if not rows:
             LOGGER.info("No hay guilds trackeadas en killboard")
             return
 
-        events = await self.albion.fetch_events(limit=50)
-        self.last_poll_at = datetime.now(timezone.utc)
-        self.last_event_count = len(events)
-        self.last_matching_events = 0
-        LOGGER.debug(f"Obtenidos {len(events)} eventos de Albion API")
-
+        # Agrupar por servidor para hacer menos llamadas a API
+        guilds_by_server = {}
         for row in rows:
-            guild_id = row[0]
-            channel_kills = row[1]
-            channel_deaths = row[2]
-            albion_guild_id = row[3]
-            LOGGER.debug(f"Checkeando guild Discord {guild_id} contra Albion guild {albion_guild_id}")
+            guild_id, channel_kills, channel_deaths, albion_guild_id, server = row
+            server = server or "europe"  # Default si es None
+            if server not in guilds_by_server:
+                guilds_by_server[server] = []
+            guilds_by_server[server].append((guild_id, channel_kills, channel_deaths, albion_guild_id))
+        
+        # Procesar eventos por servidor
+        for server, guilds in guilds_by_server.items():
+            try:
+                from services.albion_service import AlbionService
+                albion = AlbionService(server=server)
+            except Exception as e:
+                LOGGER.error(f"Error inicializando AlbionService para servidor {server}: {e}")
+                continue
+                
+            events = await albion.fetch_events(limit=50)
+            self.last_poll_at = datetime.now(timezone.utc)
+            self.last_event_count = len(events)
+            self.last_matching_events = 0
+            LOGGER.debug(f"Obtenidos {len(events)} eventos de Albion API ({server})")
 
-            for ev in events:
-                event_id = ev.get("EventId") or ev.get("Id") or ev.get("Id")
-                if not event_id:
-                    continue
+            for guild_id, channel_kills, channel_deaths, albion_guild_id in guilds:
+                LOGGER.debug(f"Checkeando guild Discord {guild_id} contra Albion guild {albion_guild_id}")
 
-                # skip if already processed
-                cur.execute("SELECT 1 FROM killboard_events WHERE event_id=?", (event_id,))
-                if cur.fetchone():
-                    continue
+                for ev in events:
+                    event_id = ev.get("EventId") or ev.get("Id") or ev.get("Id")
+                    if not event_id:
+                        continue
 
-                killer = ev.get("Killer") or {}
-                victim = ev.get("Victim") or {}
+                    # skip if already processed
+                    cur.execute("SELECT 1 FROM killboard_events WHERE event_id=?", (event_id,))
+                    if cur.fetchone():
+                        continue
 
-                sent = False
+                    killer = ev.get("Killer") or {}
+                    victim = ev.get("Victim") or {}
+
+                    sent = False
 
                 killer_gid = str(killer.get("GuildId")) if killer.get("GuildId") else None
                 victim_gid = str(victim.get("GuildId")) if victim.get("GuildId") else None
@@ -218,15 +241,33 @@ class KillboardSetup(commands.GroupCog, group_name="killboard", group_descriptio
         self.bot = bot
 
     @app_commands.command(name="track", description="Trackear kills/deaths de una guild de Albion")
-    @app_commands.describe(albion_guild_id="ID de la guild en Albion (GuildId)", channel_kills="Canal para kills", channel_deaths="Canal para deaths (opcional)")
-    async def track(self, interaction: discord.Interaction, albion_guild_id: str, channel_kills: discord.TextChannel, channel_deaths: discord.TextChannel | None=None):
+    @app_commands.describe(
+        albion_guild_id="ID de la guild en Albion (GuildId)",
+        channel_kills="Canal para kills",
+        channel_deaths="Canal para deaths (opcional)",
+        server="Servidor de Albion: europe, americas, o asia"
+    )
+    @app_commands.choices(server=[
+        app_commands.Choice(name="Europe", value="europe"),
+        app_commands.Choice(name="Americas (West)", value="americas"),
+        app_commands.Choice(name="Asia (East)", value="asia")
+    ])
+    async def track(
+        self,
+        interaction: discord.Interaction,
+        albion_guild_id: str,
+        channel_kills: discord.TextChannel,
+        server: app_commands.Choice[str] = None,
+        channel_deaths: discord.TextChannel | None = None
+    ):
+        server_name = server.value if server else "europe"
         cur = db.cursor
         cur.execute(
-            "INSERT OR REPLACE INTO killboard_tracked (guild_id, nombre, channel_kills, channel_deaths, albion_guild_id) VALUES (?,?,?,?,?)",
-            (interaction.guild_id, interaction.guild.name, channel_kills.id, channel_deaths.id if channel_deaths else None, albion_guild_id),
+            "INSERT OR REPLACE INTO killboard_tracked (guild_id, nombre, channel_kills, channel_deaths, albion_guild_id, server) VALUES (?,?,?,?,?,?)",
+            (interaction.guild_id, interaction.guild.name, channel_kills.id, channel_deaths.id if channel_deaths else None, albion_guild_id, server_name),
         )
         db.conn.commit()
-        await interaction.response.send_message("? Killboard configurado para esta guild.", ephemeral=True)
+        await interaction.response.send_message(f"✅ Killboard configurado para esta guild en servidor **{server_name.upper()}**.", ephemeral=True)
 
     @app_commands.command(name="deaths", description="Configurar el canal donde se publican las muertes")
     @app_commands.describe(channel="Canal para las muertes de la guild")
@@ -260,14 +301,15 @@ class KillboardSetup(commands.GroupCog, group_name="killboard", group_descriptio
     @app_commands.command(name="status", description="Mostrar estado del killboard para este servidor")
     async def status(self, interaction: discord.Interaction):
         cur = db.cursor
-        cur.execute("SELECT channel_kills, channel_deaths, albion_guild_id FROM killboard_tracked WHERE guild_id=?", (interaction.guild_id,))
+        cur.execute("SELECT channel_kills, channel_deaths, albion_guild_id, server FROM killboard_tracked WHERE guild_id=?", (interaction.guild_id,))
         row = cur.fetchone()
         if not row:
-            await interaction.response.send_message("? No hay killboard configurado para este servidor.", ephemeral=True)
+            await interaction.response.send_message("❌ No hay killboard configurado para este servidor.", ephemeral=True)
             return
 
         channel_kills, channel_deaths, albion_guild_id = row[0], row[1], row[2]
-        text = f"Guild Albion ID: {albion_guild_id}\nCanal kills: {channel_kills}\nCanal deaths: {channel_deaths}"
+        server = row[3] if len(row) > 3 else "europe"
+        text = f"Guild Albion ID: {albion_guild_id}\nServidor: **{server.upper()}**\nCanal kills: {channel_kills}\nCanal deaths: {channel_deaths}"
         killboard = self.bot.get_cog("Killboard")
         if killboard and killboard.last_poll_at:
             checked_at = killboard.last_poll_at.strftime("%H:%M:%S UTC")

@@ -122,7 +122,9 @@ CREATE TABLE IF NOT EXISTS killboard_tracked (
 
     channel_deaths INTEGER,
 
-    albion_guild_id TEXT
+    albion_guild_id TEXT,
+
+    server TEXT DEFAULT 'europe'
 
 );
 

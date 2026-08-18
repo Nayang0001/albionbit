@@ -2,16 +2,29 @@ import asyncio
 import aiohttp
 import logging
 
-BASE = "https://gameinfo.albiononline.com/api/gameinfo"
+# Servidores de Albion
+SERVERS = {
+    "europe": "https://gameinfo.albiononline.com/api/gameinfo",
+    "americas": "https://gameinfo-ams.albiononline.com/api/gameinfo",
+    "asia": "https://gameinfo-sgp.albiononline.com/api/gameinfo"
+}
+
+DEFAULT_SERVER = "europe"
 
 
 class AlbionService:
 
-    def __init__(self):
+    def __init__(self, server: str=DEFAULT_SERVER):
         self.logger = logging.getLogger("AlbionService")
+        self.server = server.lower()
+        if self.server not in SERVERS:
+            self.logger.warning(f"Servidor '{server}' desconocido, usando 'europe'")
+            self.server = "europe"
+        self.base_url = SERVERS[self.server]
+        self.logger.info(f"AlbionService inicializado para servidor: {self.server}")
 
     async def fetch_events(self, limit: int=50):
-        url = f"{BASE}/events?limit={limit}"
+        url = f"{self.base_url}/events?limit={limit}"
         timeout = aiohttp.ClientTimeout(total=15)
 
         for attempt in range(3):
@@ -27,7 +40,7 @@ class AlbionService:
                 await asyncio.sleep(2 * (attempt + 1))
 
     async def get_event(self, event_id: str):
-        url = f"{BASE}/events/{event_id}"
+        url = f"{self.base_url}/events/{event_id}"
         try:
             timeout = aiohttp.ClientTimeout(total=15)
             async with aiohttp.ClientSession(timeout=timeout) as session:
