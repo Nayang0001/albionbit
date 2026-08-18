@@ -21,6 +21,12 @@ class Killboard(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.logger = logging.getLogger("killboard")
+        # Activar DEBUG temporalmente para diagnóstico
+        try:
+            self.logger.setLevel(logging.DEBUG)
+            LOGGER.setLevel(logging.DEBUG)
+        except Exception:
+            pass
         
         # Asegurar que existe la columna 'server' en la BD (migración)
         try:
@@ -120,7 +126,7 @@ class Killboard(commands.Cog):
                     if sent:
                         cur.execute(
                             "INSERT OR IGNORE INTO killboard_events (event_id, guild_id, event_type) VALUES (?,?,?)",
-                            (event_id, guild_id, 'kill' if killer.get("GuildId") == albion_guild_id else 'death'),
+                            (event_id, guild_id, 'kill' if str(killer.get("GuildId")) == str(albion_guild_id) else 'death'),
                         )
                         db.conn.commit()
 
