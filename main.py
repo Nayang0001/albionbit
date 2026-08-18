@@ -19,9 +19,6 @@ bot = commands.Bot(
 
 @bot.event
 async def on_ready():
-
-    db.crear_tablas()
-
     print("=" * 40)
     print(f"Bot conectado como {bot.user}")
     print("=" * 40)
@@ -34,6 +31,8 @@ async def on_ready():
 
 async def main():
     async with bot:
+
+        db.crear_tablas()
 
         # Cargar los módulos (Cogs)
         await bot.load_extension("cogs.aventura")
